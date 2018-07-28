@@ -178,6 +178,19 @@ $\rightarrow$
     ... | tri≈ _ refl _  = just vc
     ... | tri> _ _ _     = lookup k tr
 
+    uncons : ∀ {lb ub h v} {V : Key → Set v}
+           → Tree V lb ub (suc h)
+           → ∃[ lb′ ] (V lb′ × Inserted V [ lb′ ] ub h)
+    uncons (node k v ▽ (leaf l<u) tr₁) = k , v , same tr₁
+    uncons (node k v ◺ (leaf l<u) tr₁) = k , v , same tr₁
+    uncons (node k v bl (node k₁ v₁ bl₁ tr tr₂) tr₁) with uncons (node k₁ v₁ bl₁ tr tr₂)
+    uncons (node k v ◿ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , same snd = fst , fst₁ , same (node k v ▽ snd tr₁)
+    uncons (node k v ▽ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , same snd = fst , fst₁ , chng (node k v ◺ snd tr₁)
+    uncons (node k v ◺ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , same snd = fst , fst₁ , rotˡ k v snd tr₁
+    uncons (node k v ◿ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , chng snd = fst , fst₁ , chng (node k v ◿ snd tr₁)
+    uncons (node k v ▽ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , chng snd = fst , fst₁ , chng (node k v ▽ snd tr₁)
+    uncons (node k v ◺ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , chng snd = fst , fst₁ , chng (node k v ◺ snd tr₁)
+
   module DependantMap where
     data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
       tree : ∀ {h} → Bounded.Tree V ⊥ ⊤ h → Map V
