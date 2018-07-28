@@ -9,6 +9,7 @@
 
 \DeclareUnicodeCharacter{9034}{\ensuremath{0}}
 \DeclareUnicodeCharacter{8343}{\ensuremath{_l}}
+\DeclareUnicodeCharacter{7523}{\ensuremath{_r}}
 \DeclareUnicodeCharacter{9661}{\ensuremath{\mathbin{\rotatebox[origin=c]{180}{$\dotminus$}}}}
 \DeclareUnicodeCharacter{9727}{\ensuremath{\mathbin{\rotatebox[origin=c]{225}{$\dotminus$}}}}
 \DeclareUnicodeCharacter{9722}{\ensuremath{\mathbin{\rotatebox[origin=c]{135}{$\dotminus$}}}}
@@ -119,14 +120,36 @@ module AVL
     pattern 0+  tr = false  , tr
     pattern 1+  tr = true   , tr
 \end{code}
-\centering
-\begin{forest}
-  [$u$[$v$[$a$][$b$]][$c$]]
-\end{forest}
-$\rightarrow$
-\begin{forest}
-  [$v$[$a$][$u$[$b$][$c$]]]
-\end{forest}
+\begin{figure}[!h]
+  \centering
+  \begin{forest}
+      [ $x$ [ $y$ [ $a$ ]
+                  [ $b$ ]]
+            [ $c$ ]]
+  \end{forest}
+  \begin{forest}
+      [ $y$ [$a$]
+            [ $x$ [ $b$ ]
+                  [ $c$ ]]]
+  \end{forest}
+\end{figure}
+\begin{figure}[!h]
+  \centering
+  \begin{forest}
+      [ $x$ [ $y$ [ $a$ ]
+                  [ $z$ [ $b$ ]
+                        [ $c$ ]]]
+            [ $d$ ]
+      ]
+  \end{forest}
+  \begin{forest}
+      [ $z$ [ $y$ [ $a$ ]
+                  [ $b$ ]]
+            [ $x$ [ $c$ ]
+                  [ $d$ ]]
+      ]
+  \end{forest}
+\end{figure}
 \begin{code}
     rotʳ  : ∀ {lb ub rh v} {V : Key → Set v}
           → (k : Key)
@@ -134,19 +157,36 @@ $\rightarrow$
           → Tree V lb [ k ] (suc (suc rh))
           → Tree V [ k ] ub rh
           → Altered V lb ub (suc (suc rh))
-    rotʳ u uc (node v vc ◿  ta tb) tc = 0+  (node v vc ▽  ta (node u uc ▽  tb tc))
-    rotʳ u uc (node v vc ▽  ta tb) tc = 1+  (node v vc ◺  ta (node u uc ◿  tb tc))
-    rotʳ u uc (node v vc ◺  ta (node w wc bw tb tc)) td =
-      0+ (node w wc ▽ (node v vc (◺⇒◿ bw) ta tb) (node u uc (◿⇒◺ bw) tc td))
+    rotʳ x xv (node y yv ◿  a b) c = 0+  (node y yv ▽  a (node x xv ▽  b c))
+    rotʳ x xv (node y yv ▽  a b) c = 1+  (node y yv ◺  a (node x xv ◿  b c))
+    rotʳ x xv (node y yv ◺  a (node z zv bl b c)) d =
+      0+ (node z zv ▽ (node y yv (◺⇒◿ bl) a b) (node x xv (◿⇒◺ bl) c d))
 \end{code}
-\centering
-\begin{forest}
-  [$u$[$c$][$v$[$b$][$a$]]]
-\end{forest}
-$\rightarrow$
-\begin{forest}
-  [$v$[$u$[$c$][$b$]][$a$]]
-\end{forest}
+\begin{figure}
+  \centering
+  \begin{forest}
+    [$x$[$c$][$y$[$b$][$a$]]]
+  \end{forest}
+  \begin{forest}
+    [$y$[$x$[$c$][$b$]][$a$]]
+  \end{forest}
+\end{figure}
+\begin{figure}
+  \centering
+  \begin{forest}
+    [ $x$ [ $d$ ]
+          [ $y$ [ $z$ [ $c$ ]
+                      [ $b$ ]]
+                [ $a$ ]
+          ]
+    ]
+  \end{forest}
+  \begin{forest}
+    [ $z$ [ $x$ [$d$] [$c$] ]
+          [ $y$ [$b$] [$a$] ]
+    ]
+  \end{forest}
+\end{figure}
 \begin{code}
     rotˡ  : ∀ {lb ub lh v} {V : Key → Set v}
           → (k : Key)
@@ -154,10 +194,10 @@ $\rightarrow$
           → Tree V lb [ k ] lh
           → Tree V [ k ] ub (suc (suc lh))
           → Altered V lb ub (suc (suc lh))
-    rotˡ u uc tc (node v vc  ◺  tb ta) = 0+  (node v vc  ▽  (node u uc  ▽  tc tb) ta)
-    rotˡ u uc tc (node v vc  ▽  tb ta) = 1+  (node v vc  ◿  (node u uc  ◺  tc tb) ta)
-    rotˡ u uc td (node v vc  ◿  (node w wc bw tc tb) ta) =
-      0+ (node w wc ▽ (node u uc (◺⇒◿ bw) td tc) (node v vc (◿⇒◺ bw) tb ta))
+    rotˡ x xv c (node y yv  ◺  b a) = 0+  (node y yv  ▽  (node x xv  ▽  c b) a)
+    rotˡ x xv c (node y yv  ▽  b a) = 1+  (node y yv  ◿  (node x xv  ◺  c b) a)
+    rotˡ x xv d (node y yv  ◿  (node z zv bl c b) a) =
+      0+ (node z zv ▽ (node x xv (◺⇒◿ bl) d c) (node y yv (◿⇒◺ bl) b a))
 \end{code}
 \begin{code}
     insert   : ∀ {l u h v} {V : Key → Set v} (k : Key)
@@ -195,7 +235,6 @@ $\rightarrow$
     ... | tri< _ _ _     = lookup k tl
     ... | tri≈ _ refl _  = just vc
     ... | tri> _ _ _     = lookup k tr
-
 
     record Uncons {v} (V : Key → Set v) (lb : ⌶) (ub : ⌶ ) (h : ℕ) : Set (k ⊔ v ⊔ r) where
       constructor uncons
@@ -246,24 +285,25 @@ $\rightarrow$
            → Tree V lb ub (suc h)
            → Altered V lb ub h
     delete k (node k₁ v bl tl tr) with compare k k₁
-    delete k (node {lh = zero}    k₁ v bl tl tr) | tri< a ¬b ¬c = 1+ (node k₁ v bl tl tr)
-    delete k (node {lh = suc lh}  k₁ v bl tl tr) | tri< a ¬b ¬c with delete k tl | bl
-    ... | 0+ tl′ | ◿ = 0+ (node k₁ v ▽ tl′ tr)
-    ... | 0+ tl′ | ▽ = 1+ (node k₁ v ◺ tl′ tr)
-    ... | 0+ tl′ | ◺ = rotˡ k₁ v tl′ tr
-    ... | 1+ tl′ | _ = 1+ (node k₁ v bl tl′ tr)
-    delete {lb} k₁ (node {rh = zero} k₁ v bl tl (leaf k₁<ub)) | tri≈ ¬a refl ¬c with bl | tl
-    ... | ◿ | _ = 0+ (widen k₁<ub tl)
-    ... | ▽ | leaf lb<k₁ = 0+ (leaf (⌶<-trans {lb} lb<k₁ k₁<ub))
-    delete k₁ (node {rh = suc rh} k₁ v bl tl (node k v₁ bl₁ tr tr₁)) | tri≈ ¬a refl ¬c with bl | uncons′ k v₁ bl₁ tr tr₁
+    delete k (node {lh = zero}    k₁ v bl tl tr) | tri< _ _ _ = 1+ (node k₁ v bl tl tr)
+    delete k (node {lh = suc lh}  k₁ v bl tl tr) | tri< _ _ _ with delete k tl | bl
+    ... | 0+ tl′ | ◿  = 0+ (node k₁ v ▽ tl′ tr)
+    ... | 0+ tl′ | ▽  = 1+ (node k₁ v ◺ tl′ tr)
+    ... | 0+ tl′ | ◺  = rotˡ k₁ v tl′ tr
+    ... | 1+ tl′ | _  = 1+ (node k₁ v bl tl′ tr)
+    delete {lb} k (node {rh = zero} k v bl tl (leaf k<ub)) | tri≈ _ refl _ with bl | tl
+    ... | ◿  | _ = 0+ (widen k<ub tl)
+    ... | ▽  | leaf lb<k = 0+ (leaf (⌶<-trans {lb} lb<k k<ub))
+    delete k (node {rh = suc rh} k v bl tl (node kᵣ vᵣ blᵣ tlᵣ trᵣ)) | tri≈ _ refl _
+      with bl | uncons′ kᵣ vᵣ blᵣ tlᵣ trᵣ
     ... | ◿  | uncons k′ v′ l<u (0+  tr′) = rotʳ k′ v′ (widen l<u tl) tr′
     ... | ◿  | uncons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ◿  (widen l<u tl) tr′)
     ... | ▽  | uncons k′ v′ l<u (0+  tr′) = 1+ (node k′ v′ ◿  (widen l<u tl) tr′)
     ... | ▽  | uncons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ▽  (widen l<u tl) tr′)
     ... | ◺  | uncons k′ v′ l<u (0+  tr′) = 0+ (node k′ v′ ▽  (widen l<u tl) tr′)
     ... | ◺  | uncons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ◺  (widen l<u tl) tr′)
-    delete k (node {rh = zero} k₁ v bl tl tr)   | tri> ¬a ¬b c = 1+ (node k₁ v bl tl tr)
-    delete k (node {rh = suc rh} k₁ v bl tl tr) | tri> ¬a ¬b c with delete k tr | bl
+    delete k (node {rh = zero} k₁ v bl tl tr)   | tri> _ ¬b c = 1+ (node k₁ v bl tl tr)
+    delete k (node {rh = suc rh} k₁ v bl tl tr) | tri> _ ¬b c with delete k tr | bl
     ... | 0+ tr′  | ◿  = rotʳ k₁ v tl tr′
     ... | 0+ tr′  | ▽  = 1+ (node k₁ v ◿ tl tr′)
     ... | 0+ tr′  | ◺  = 0+ (node k₁ v ▽ tl tr′)
