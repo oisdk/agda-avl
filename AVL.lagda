@@ -245,29 +245,27 @@ $\rightarrow$
            → Tree V lb ub (suc h)
            → Altered V lb ub h
     delete k (node k₁ v bl tl tr) with compare k k₁
-    delete k (node {lh = zero} k₁ v bl tl tr) | tri< a ¬b ¬c = 1+ (node k₁ v bl tl tr)
-    delete k (node {lh = suc lh} k₁ v bl tl tr) | tri< a ¬b ¬c with delete k tl
-    delete k (node {_} {suc lh} k₁ v ◿ tl tr) | tri< a ¬b ¬c | 0+ tl′ = 0+ (node k₁ v ▽ tl′ tr)
-    delete k (node {_} {suc lh} k₁ v ▽ tl tr) | tri< a ¬b ¬c | 0+ tl′ = 1+ (node k₁ v ◺ tl′ tr)
-    delete k (node {_} {suc lh} k₁ v ◺ tl tr) | tri< a ¬b ¬c | 0+ tl′ = rotˡ k₁ v tl′ tr
-    delete k (node {_} {suc lh} k₁ v bl tl tr) | tri< a ¬b ¬c | 1+ tl′ = 1+ (node k₁ v bl tl′ tr)
+    delete k (node {lh = zero} k₁ v bl tl tr)   | tri< a ¬b ¬c = 1+ (node k₁ v bl tl tr)
+    delete k (node {lh = suc lh} k₁ v bl tl tr) | tri< a ¬b ¬c with delete k tl | bl
+    ... | 0+ tl′ | ◿ = 0+ (node k₁ v ▽ tl′ tr)
+    ... | 0+ tl′ | ▽ = 1+ (node k₁ v ◺ tl′ tr)
+    ... | 0+ tl′ | ◺ = rotˡ k₁ v tl′ tr
+    ... | 1+ tl′ | _ = 1+ (node k₁ v bl tl′ tr)
     delete k₁ (node {rh = zero} k₁ v ◿ tl (leaf l<u)) | tri≈ ¬a refl ¬c = 0+ (widen l<u tl)
     delete {lb} k₁ (node {rh = zero} k₁ v ▽ (leaf l<u) (leaf l<u₁)) | tri≈ ¬a refl ¬c = 0+ (leaf (⌶<-trans {lb} l<u l<u₁))
-    delete k₁ (node {rh = suc rh} k₁ v ◿ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c with uncons′ k v₁ bl tr tr₁
-    delete k₁ (node {_} {_} {suc rh} k₁ v ◿ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (0+ tr′) = rotʳ k′ v′ (widen l<u tl) tr′
-    delete k₁ (node {_} {_} {suc rh} k₁ v ◿ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ◿ (widen l<u tl) tr′)
-    delete k₁ (node {rh = suc rh} k₁ v ▽ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c with uncons′ k v₁ bl tr tr₁
-    delete k₁ (node {rh = suc rh} k₁ v ▽ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (0+ tr′) = 1+ (node k′ v′ ◿ (widen l<u tl) tr′)
-    delete k₁ (node {rh = suc rh} k₁ v ▽ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ▽ (widen l<u tl) tr′)
-    delete k₁ (node {rh = suc rh} k₁ v ◺ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c with uncons′ k v₁ bl tr tr₁
-    delete k₁ (node {rh = suc rh} k₁ v ◺ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (0+ tr′) = 0+ (node k′ v′ ▽ (widen l<u tl) tr′)
-    delete k₁ (node {rh = suc rh} k₁ v ◺ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ◺ (widen l<u tl) tr′)
+    delete k₁ (node {rh = suc rh} k₁ v bl tl (node k v₁ bl₁ tr tr₁)) | tri≈ ¬a refl ¬c with bl | uncons′ k v₁ bl₁ tr tr₁
+    ... | ◿ | uncons k′ v′ l<u (0+ tr′) = rotʳ k′ v′ (widen l<u tl) tr′
+    ... | ◿ | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ◿ (widen l<u tl) tr′)
+    ... | ▽ | uncons k′ v′ l<u (0+ tr′) = 1+ (node k′ v′ ◿ (widen l<u tl) tr′)
+    ... | ▽ | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ▽ (widen l<u tl) tr′)
+    ... | ◺ | uncons k′ v′ l<u (0+ tr′) = 0+ (node k′ v′ ▽ (widen l<u tl) tr′)
+    ... | ◺ | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ◺ (widen l<u tl) tr′)
     delete k (node {rh = zero} k₁ v bl tl tr) | tri> ¬a ¬b c = 1+ (node k₁ v bl tl tr)
-    delete k (node {rh = suc rh} k₁ v bl tl tr) | tri> ¬a ¬b c with delete k tr
-    delete k (node {lh = _} {suc rh} k₁ v ◿ tl tr) | tri> ¬a ¬b c | 0+ tr′ = rotʳ k₁ v tl tr′
-    delete k (node {lh = _} {suc rh} k₁ v ▽ tl tr) | tri> ¬a ¬b c | 0+ tr′ = 1+ (node k₁ v ◿ tl tr′)
-    delete k (node {lh = _} {suc rh} k₁ v ◺ tl tr) | tri> ¬a ¬b c | 0+ tr′ = 0+ (node k₁ v ▽ tl tr′)
-    delete k (node {lh = _} {suc rh} k₁ v bl tl tr) | tri> ¬a ¬b c | 1+ tr′ = 1+ (node k₁ v bl tl tr′)
+    delete k (node {rh = suc rh} k₁ v bl tl tr) | tri> ¬a ¬b c with delete k tr | bl
+    ... | 0+ tr′ | ◿ = rotʳ k₁ v tl tr′
+    ... | 0+ tr′ | ▽ = 1+ (node k₁ v ◿ tl tr′)
+    ... | 0+ tr′ | ◺ = 0+ (node k₁ v ▽ tl tr′)
+    ... | 1+ tr′ | _ = 1+ (node k₁ v bl tl tr′)
 
   module DependantMap where
     data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
