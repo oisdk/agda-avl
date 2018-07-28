@@ -163,9 +163,17 @@ whose height may have changed:
 \end{code}
 \subsection{Right Rotation}
 When the left subtree becomes too heavy, we rotate the tree to the
-right. This rotation comes in two varieties: single and double. Single
-rotation can be seen in figure~\ref{rightsingle}, double in
-figure~\ref{rightdouble}.
+right.
+\begin{code}
+    rotʳ  : ∀ {lb ub rh v} {V : Key → Set v}
+          → (k : Key)
+          → V k
+          → Tree V lb [ k ] (suc (suc rh))
+          → Tree V [ k ] ub rh
+          → Altered V lb ub (suc (suc rh))
+\end{code}
+This rotation comes in two varieties: single and double. Single
+rotation can be seen in figure~\ref{rightsingle}.
 \begin{figure}[h]
   \centering
   \begin{forest}
@@ -186,6 +194,11 @@ figure~\ref{rightdouble}.
   \caption{Single right-rotation}
   \label{rightsingle}
 \end{figure}
+\begin{code}
+    rotʳ x xv (node y yv ◿  a b) c = 0+  (node y yv ▽  a (node x xv ▽  b c))
+    rotʳ x xv (node y yv ▽  a b) c = 1+  (node y yv ◺  a (node x xv ◿  b c))
+\end{code}
+And double rotation in figure~\ref{rightdouble}.
 \begin{figure}[h]
   \centering
   \begin{forest}
@@ -211,20 +224,20 @@ figure~\ref{rightdouble}.
   \label{rightdouble}
 \end{figure}
 \begin{code}
-    rotʳ  : ∀ {lb ub rh v} {V : Key → Set v}
-          → (k : Key)
-          → V k
-          → Tree V lb [ k ] (suc (suc rh))
-          → Tree V [ k ] ub rh
-          → Altered V lb ub (suc (suc rh))
-    rotʳ x xv (node y yv ◿  a b) c = 0+  (node y yv ▽  a (node x xv ▽  b c))
-    rotʳ x xv (node y yv ▽  a b) c = 1+  (node y yv ◺  a (node x xv ◿  b c))
     rotʳ x xv (node y yv ◺  a (node z zv bl b c)) d =
       0+ (node z zv ▽ (node y yv (◺⇒◿ bl) a b) (node x xv (◿⇒◺ bl) c d))
 \end{code}
 \subsection{Left Rotation}
 Left-rotation is essentially the inverse of right.
-\begin{figure}[h]
+\begin{code}
+    rotˡ  : ∀ {lb ub lh v} {V : Key → Set v}
+          → (k : Key)
+          → V k
+          → Tree V lb [ k ] lh
+          → Tree V [ k ] ub (suc (suc lh))
+          → Altered V lb ub (suc (suc lh))
+\end{code}
+\begin{figure}[h!]
   \centering
   \begin{forest}
     [$x$[$c$][$y$[$b$][$a$]]]
@@ -239,7 +252,12 @@ Left-rotation is essentially the inverse of right.
   \end{forest}
   \caption{Single left-rotation}
 \end{figure}
-\begin{figure}[h]
+Single:
+\begin{code}
+    rotˡ x xv c (node y yv  ◺  b a) = 0+  (node y yv  ▽  (node x xv  ▽  c b) a)
+    rotˡ x xv c (node y yv  ▽  b a) = 1+  (node y yv  ◿  (node x xv  ◺  c b) a)
+\end{code}
+\begin{figure}[h!]
   \centering
   \begin{forest}
     [ $x$ [ $d$ ]
@@ -261,15 +279,8 @@ Left-rotation is essentially the inverse of right.
   \end{forest}
   \caption{Double left-rotation}
 \end{figure}
+and double:
 \begin{code}
-    rotˡ  : ∀ {lb ub lh v} {V : Key → Set v}
-          → (k : Key)
-          → V k
-          → Tree V lb [ k ] lh
-          → Tree V [ k ] ub (suc (suc lh))
-          → Altered V lb ub (suc (suc lh))
-    rotˡ x xv c (node y yv  ◺  b a) = 0+  (node y yv  ▽  (node x xv  ▽  c b) a)
-    rotˡ x xv c (node y yv  ▽  b a) = 1+  (node y yv  ◿  (node x xv  ◺  c b) a)
     rotˡ x xv d (node y yv  ◿  (node z zv bl c b) a) =
       0+ (node z zv ▽ (node x xv (◺⇒◿ bl) d c) (node y yv (◿⇒◺ bl) b a))
 \end{code}
