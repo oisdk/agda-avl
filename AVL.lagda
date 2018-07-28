@@ -61,6 +61,35 @@ module AVL
   [ _ ]  ⌶< ⊤      = Lift r ⍑
   [ x ]  ⌶< [ y ]  = x < y
 
+  ⌶<-trans : ∀ {x y z} → x ⌶< y → y ⌶< z → x ⌶< z
+  ⌶<-trans {⊥}     {⊥}     {⊥}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {⊥}     {⊥}     {⊤}     _ _ = lift tt
+  ⌶<-trans {⊥}     {⊥}     {[ z ]} _ _ = lift tt
+  ⌶<-trans {⊥}     {⊤}     {⊥}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {⊥}     {⊤}     {⊤}     _ _ = lift tt
+  ⌶<-trans {⊥}     {⊤}     {[ z ]} _ _ = lift tt
+  ⌶<-trans {⊥}     {[ y ]} {⊥}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {⊥}     {[ y ]} {⊤}     _ _ = lift tt
+  ⌶<-trans {⊥}     {[ y ]} {[ z ]} _ _ = lift tt
+  ⌶<-trans {⊤}     {⊥}     {⊥}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {⊤}     {⊥}     {⊤}     x<y _ = lift (Lift.lower x<y)
+  ⌶<-trans {⊤}     {⊥}     {[ z ]} x<y _ = lift (Lift.lower x<y)
+  ⌶<-trans {⊤}     {⊤}     {⊥}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {⊤}     {⊤}     {⊤}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {⊤}     {⊤}     {[ z ]} _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {⊤}     {[ y ]} {⊥}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {⊤}     {[ y ]} {⊤}     x<y _ = lift (Lift.lower x<y)
+  ⌶<-trans {⊤}     {[ y ]} {[ z ]} x<y _ = lift (Lift.lower x<y)
+  ⌶<-trans {[ x ]} {⊥}     {⊥}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {[ x ]} {⊥}     {⊤}     _ _ = lift tt
+  ⌶<-trans {[ x ]} {⊥} {[ z ]} (lift ()) _
+  ⌶<-trans {[ x ]} {⊤}     {⊥}     _ y<z = lift (Lift.lower y<z)
+  ⌶<-trans {[ x ]} {⊤}     {⊤}     x<y y<z = lift tt
+  ⌶<-trans {[ x ]} {⊤} {[ z ]} x<y (lift ())
+  ⌶<-trans {[ x ]} {[ y ]} {⊥}     x<y y<z = lift (Lift.lower y<z)
+  ⌶<-trans {[ x ]} {[ y ]} {⊤}     x<y y<z = lift tt
+  ⌶<-trans {[ x ]} {[ y ]} {[ z ]} x<y y<z = IsStrictTotalOrder.trans isStrictTotalOrder x<y y<z
+
   infix 4 _<_<_
 
   _<_<_ : ⌶ → Key → ⌶ → Set r
@@ -95,8 +124,8 @@ module AVL
                  (ku : Tree V [ k ] u rh) →
                  Tree V l u (suc h)
 
-    Inserted : ∀ {v} (V : Key → Set v) (l u : ⌶) (n : ℕ) → Set (k ⊔ v ⊔ r)
-    Inserted V l u n = ∃[ inc ] (Tree V l u (if inc then suc n else n))
+    Altered : ∀ {v} (V : Key → Set v) (l u : ⌶) (n : ℕ) → Set (k ⊔ v ⊔ r)
+    Altered V l u n = ∃[ inc ] (Tree V l u (if inc then suc n else n))
 
     pattern same  tr = false  , tr
     pattern chng  tr = true   , tr
@@ -115,7 +144,7 @@ $\rightarrow$
           → V k
           → Tree V lb [ k ] (suc (suc rh))
           → Tree V [ k ] ub rh
-          → Inserted V lb ub (suc (suc rh))
+          → Altered V lb ub (suc (suc rh))
     rotʳ u uc (node v vc ◿  ta tb) tc = same  (node v vc ▽  ta (node u uc ▽  tb tc))
     rotʳ u uc (node v vc ▽  ta tb) tc = chng  (node v vc ◺  ta (node u uc ◿  tb tc))
     rotʳ u uc (node v vc ◺  ta (node w wc bw tb tc)) td =
@@ -135,7 +164,7 @@ $\rightarrow$
           → V k
           → Tree V lb [ k ] lh
           → Tree V [ k ] ub (suc (suc lh))
-          → Inserted V lb ub (suc (suc lh))
+          → Altered V lb ub (suc (suc lh))
     rotˡ u uc tc (node v vc  ◺  tb ta) = same  (node v vc  ▽  (node u uc  ▽  tc tb) ta)
     rotˡ u uc tc (node v vc  ▽  tb ta) = chng  (node v vc  ◿  (node u uc  ◺  tc tb) ta)
     rotˡ u uc td (node v vc  ◿  (node w wc bw tc tb) ta) =
@@ -147,7 +176,7 @@ $\rightarrow$
              → (V k → V k → V k)
              → Tree V l u h
              → l < k < u
-             → Inserted V l u h
+             → Altered V l u h
     insert v vc f (leaf l<u) (l , u) = chng (node v vc ▽ (leaf l) (leaf u))
     insert v vc f (node k kc bl tl tr) prf with compare v k
     insert v vc f (node k kc bl tl tr) (l , _)
@@ -178,18 +207,48 @@ $\rightarrow$
     ... | tri≈ _ refl _  = just vc
     ... | tri> _ _ _     = lookup k tr
 
-    uncons : ∀ {lb ub h v} {V : Key → Set v}
+    uncons : ∀ {lb ub h lh rh v} {V : Key → Set v}
+           → (k : Key)
+           → V k
+           → ⟨ lh ⊔ rh ⟩≡ h
+           → Tree V lb [ k ] lh
+           → Tree V [ k ] ub rh
+           → ∃[ lb′ ] (V lb′ × Altered V [ lb′ ] ub h)
+    uncons k v ▽ (leaf l<u) tr = k , v , same tr
+    uncons k v ▽ (node k₁ v₁ bl tl₁ tr₁) tr with uncons k₁ v₁ bl tl₁ tr₁
+    ... | k′ , v′ , same tl′ = k′ , v′ , chng (node k v ◺ tl′ tr)
+    ... | k′ , v′ , chng tl′ = k′ , v′ , chng (node k v ▽ tl′ tr)
+    uncons k v ◺ (leaf l<u) tr = k , v , same tr
+    uncons k v ◺ (node k₁ v₁ bl tl₁ tr₁) tr with uncons k₁ v₁ bl tl₁ tr₁
+    ... | k′ , v′ , same tl′ = k′ , v′ , rotˡ k v tl′ tr
+    ... | k′ , v′ , chng tl′ = k′ , v′ , chng (node k v ◺ tl′ tr)
+    uncons k v ◿ (node k₁ v₁ bl tl₁ tr₁) tr with uncons k₁ v₁ bl tl₁ tr₁
+    ... | k′ , v′ , same tl′ = k′ , v′ , same (node k v ▽ tl′ tr)
+    ... | k′ , v′ , chng tl′ = k′ , v′ , chng (node k v ◿ tl′ tr)
+
+    snoc : ∀ {lb ub ub′ h v} {V : Key → Set v}
+         → ub ⌶< ub′
+         → Tree V lb ub h
+         → Tree V lb ub′ h
+    snoc prf (leaf l<u) = leaf {!!}
+    snoc prf (node k v bl tr tr₁) = {!!}
+
+    delete : ∀ {lb ub h v} {V : Key → Set v}
+           → (k : Key)
            → Tree V lb ub (suc h)
-           → ∃[ lb′ ] (V lb′ × Inserted V [ lb′ ] ub h)
-    uncons (node k v ▽ (leaf l<u) tr₁) = k , v , same tr₁
-    uncons (node k v ◺ (leaf l<u) tr₁) = k , v , same tr₁
-    uncons (node k v bl (node k₁ v₁ bl₁ tr tr₂) tr₁) with uncons (node k₁ v₁ bl₁ tr tr₂)
-    uncons (node k v ◿ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , same snd = fst , fst₁ , same (node k v ▽ snd tr₁)
-    uncons (node k v ▽ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , same snd = fst , fst₁ , chng (node k v ◺ snd tr₁)
-    uncons (node k v ◺ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , same snd = fst , fst₁ , rotˡ k v snd tr₁
-    uncons (node k v ◿ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , chng snd = fst , fst₁ , chng (node k v ◿ snd tr₁)
-    uncons (node k v ▽ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , chng snd = fst , fst₁ , chng (node k v ▽ snd tr₁)
-    uncons (node k v ◺ (node k₁ v₁ bl₁ tr tr₂) tr₁) | fst , fst₁ , chng snd = fst , fst₁ , chng (node k v ◺ snd tr₁)
+           → Altered V lb ub h
+    delete k (node k₁ v bl tl tr) with compare k k₁
+    delete k (node {lh = zero} k₁ v bl tl tr) | tri< a ¬b ¬c = chng (node k₁ v bl tl tr)
+    delete k (node {lh = suc lh} k₁ v bl tl tr) | tri< a ¬b ¬c with delete k tl
+    delete k (node {_} {suc lh} k₁ v ◿ tl tr) | tri< a ¬b ¬c | same tl′ = same (node k₁ v ▽ tl′ tr)
+    delete k (node {_} {suc lh} k₁ v ▽ tl tr) | tri< a ¬b ¬c | same tl′ = chng (node k₁ v ◺ tl′ tr)
+    delete k (node {_} {suc lh} k₁ v ◺ tl tr) | tri< a ¬b ¬c | same tl′ = rotˡ k₁ v tl′ tr
+    delete k (node {_} {suc lh} k₁ v bl tl tr) | tri< a ¬b ¬c | chng tl′ = chng (node k₁ v bl tl′ tr)
+    delete k (node k₁ v bl tl (leaf l<u)) | tri≈ ¬a b ¬c = {!!}
+    delete k (node k₁ v bl tl (node k₂ v₁ bl₁ tr tr₁)) | tri≈ ¬a b ¬c with uncons k₂ v₁ bl₁ tr tr₁
+    delete .k₁ (node k₁ v bl tl (node k₂ v₁ bl₁ tr tr₁)) | tri≈ ¬a refl ¬c | k′ , v′ , same tr′ = chng {!node k′ v′ {!!} l tr′!}
+    delete k (node k₁ v bl tl (node k₂ v₁ bl₁ tr tr₁)) | tri≈ ¬a b ¬c | k′ , v′ , chng tr′ = {!!}
+    delete k (node k₁ v bl tl tr) | tri> ¬a ¬b c = {!!}
 
   module DependantMap where
     data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
