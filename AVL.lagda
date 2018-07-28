@@ -204,32 +204,41 @@ $\rightarrow$
         l<u : lb ⌶< [ head ]
         tail : Altered V [ head ] ub h
 
-
     uncons′ : ∀ {lb ub h lh rh v} {V : Key → Set v}
            → (k : Key)
            → V k
            → ⟨ lh ⊔ rh ⟩≡ h
            → Tree V lb [ k ] lh
            → Tree V [ k ] ub rh
-           → ∃[ lb′ ] (V lb′ × lb ⌶< [ lb′ ] × Altered V [ lb′ ] ub h)
-    uncons′ k v ▽ (leaf l<u) tr = k , v , l<u , 0+ tr
-    uncons′ k v ▽ (node k₁ v₁ bl tl₁ tr₁) tr with uncons′ k₁ v₁ bl tl₁ tr₁
-    ... | k′ , v′ , l<u′ , 0+ tl′ = k′ , v′ , l<u′ , 1+ (node k v ◺ tl′ tr)
-    ... | k′ , v′ , l<u′ , 1+ tl′ = k′ , v′ , l<u′ , 1+ (node k v ▽ tl′ tr)
-    uncons′ k v ◺ (leaf l<u) tr = k , v , l<u , 0+ tr
-    uncons′ k v ◺ (node k₁ v₁ bl tl₁ tr₁) tr with uncons′ k₁ v₁ bl tl₁ tr₁
-    ... | k′ , v′ , l<u′ , 0+ tl′ = k′ , v′ , l<u′ , rotˡ k v tl′ tr
-    ... | k′ , v′ , l<u′ , 1+ tl′ = k′ , v′ , l<u′ , 1+ (node k v ◺ tl′ tr)
-    uncons′ k v ◿ (node k₁ v₁ bl tl₁ tr₁) tr with uncons′ k₁ v₁ bl tl₁ tr₁
-    ... | k′ , v′ , l<u′ , 0+ tl′ = k′ , v′ , l<u′ , 0+ (node k v ▽ tl′ tr)
-    ... | k′ , v′ , l<u′ , 1+ tl′ = k′ , v′ , l<u′ , 1+ (node k v ◿ tl′ tr)
+           → Uncons V lb ub h
+    uncons′ k v bl tl tr = go k v bl tl tr id
+      where
+      go : ∀ {lb ub h lh rh v ub′ h′} {V : Key → Set v}
+          → (k : Key)
+          → V k
+          → ⟨ lh ⊔ rh ⟩≡ h
+          → Tree V lb [ k ] lh
+          → Tree V [ k ] ub rh
+          → (∀ {lb′} → Altered V [ lb′ ] ub h → Altered V [ lb′ ] ub′ h′)
+          → Uncons V lb ub′ h′
+      go k v ▽ (leaf l<u) tr c = uncons k v l<u (c (0+ tr))
+      go k v ▽ (node k₁ v₁ bl tl₁ tr₁) tr c = go k₁ v₁ bl tl₁ tr₁
+        λ { (0+ tl′) → c (1+ (node k v ◺ tl′ tr))
+          ; (1+ tl′) → c (1+ (node k v ▽ tl′ tr)) }
+      go k v ◺ (leaf l<u) tr c = uncons k v l<u (c (0+ tr))
+      go k v ◺ (node k₁ v₁ bl tl₁ tr₁) tr c = go k₁ v₁ bl tl₁ tr₁
+        λ { (0+ tl′) → c (rotˡ k v tl′ tr)
+          ; (1+ tl′) → c (1+ (node k v ◺ tl′ tr)) }
+      go k v ◿ (node k₁ v₁ bl tl₁ tr₁) tr c = go k₁ v₁ bl tl₁ tr₁
+        λ { (0+ tl′) → c (0+ (node k v ▽ tl′ tr))
+          ; (1+ tl′) → c (1+ (node k v ◿ tl′ tr))}
 
-    snoc : ∀ {lb ub ub′ h v} {V : Key → Set v}
+    widen : ∀ {lb ub ub′ h v} {V : Key → Set v}
          → ub ⌶< ub′
          → Tree V lb ub h
          → Tree V lb ub′ h
-    snoc {lb} ub<ub′ (leaf l<u) = leaf (⌶<-trans {lb} l<u ub<ub′)
-    snoc ub<ub′ (node k v bl tl tr) = node k v bl tl (snoc ub<ub′ tr)
+    widen {lb} ub<ub′ (leaf l<u) = leaf (⌶<-trans {lb} l<u ub<ub′)
+    widen ub<ub′ (node k v bl tl tr) = node k v bl tl (widen ub<ub′ tr)
 
     delete : ∀ {lb ub h v} {V : Key → Set v}
            → (k : Key)
@@ -242,17 +251,17 @@ $\rightarrow$
     delete k (node {_} {suc lh} k₁ v ▽ tl tr) | tri< a ¬b ¬c | 0+ tl′ = 1+ (node k₁ v ◺ tl′ tr)
     delete k (node {_} {suc lh} k₁ v ◺ tl tr) | tri< a ¬b ¬c | 0+ tl′ = rotˡ k₁ v tl′ tr
     delete k (node {_} {suc lh} k₁ v bl tl tr) | tri< a ¬b ¬c | 1+ tl′ = 1+ (node k₁ v bl tl′ tr)
-    delete k₁ (node {rh = zero} k₁ v ◿ tl (leaf l<u)) | tri≈ ¬a refl ¬c = 0+ (snoc l<u tl)
+    delete k₁ (node {rh = zero} k₁ v ◿ tl (leaf l<u)) | tri≈ ¬a refl ¬c = 0+ (widen l<u tl)
     delete {lb} k₁ (node {rh = zero} k₁ v ▽ (leaf l<u) (leaf l<u₁)) | tri≈ ¬a refl ¬c = 0+ (leaf (⌶<-trans {lb} l<u l<u₁))
     delete k₁ (node {rh = suc rh} k₁ v ◿ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c with uncons′ k v₁ bl tr tr₁
-    delete k₁ (node {_} {_} {suc rh} k₁ v ◿ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | k′ , v′ , l<u , 0+ tr′ = rotʳ k′ v′ (snoc l<u tl) tr′
-    delete k₁ (node {_} {_} {suc rh} k₁ v ◿ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | k′ , v′ , l<u , 1+ tr′ = 1+ (node k′ v′ ◿ (snoc l<u tl) tr′)
+    delete k₁ (node {_} {_} {suc rh} k₁ v ◿ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (0+ tr′) = rotʳ k′ v′ (widen l<u tl) tr′
+    delete k₁ (node {_} {_} {suc rh} k₁ v ◿ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ◿ (widen l<u tl) tr′)
     delete k₁ (node {rh = suc rh} k₁ v ▽ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c with uncons′ k v₁ bl tr tr₁
-    delete k₁ (node {rh = suc rh} k₁ v ▽ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | k′ , v′ , l<u , 0+ tr′ = 1+ (node k′ v′ ◿ (snoc l<u tl) tr′)
-    delete k₁ (node {rh = suc rh} k₁ v ▽ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | k′ , v′ , l<u , 1+ tr′ = 1+ (node k′ v′ ▽ (snoc l<u tl) tr′)
+    delete k₁ (node {rh = suc rh} k₁ v ▽ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (0+ tr′) = 1+ (node k′ v′ ◿ (widen l<u tl) tr′)
+    delete k₁ (node {rh = suc rh} k₁ v ▽ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ▽ (widen l<u tl) tr′)
     delete k₁ (node {rh = suc rh} k₁ v ◺ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c with uncons′ k v₁ bl tr tr₁
-    delete k₁ (node {rh = suc rh} k₁ v ◺ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | k′ , v′ , l<u , 0+ tr′ = 0+ (node k′ v′ ▽ (snoc l<u tl) tr′)
-    delete k₁ (node {rh = suc rh} k₁ v ◺ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | k′ , v′ , l<u , 1+ tr′ = 1+ (node k′ v′ ◺ (snoc l<u tl) tr′)
+    delete k₁ (node {rh = suc rh} k₁ v ◺ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (0+ tr′) = 0+ (node k′ v′ ▽ (widen l<u tl) tr′)
+    delete k₁ (node {rh = suc rh} k₁ v ◺ tl (node k v₁ bl tr tr₁)) | tri≈ ¬a refl ¬c | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ◺ (widen l<u tl) tr′)
     delete k (node {rh = zero} k₁ v bl tl tr) | tri> ¬a ¬b c = 1+ (node k₁ v bl tl tr)
     delete k (node {rh = suc rh} k₁ v bl tl tr) | tri> ¬a ¬b c with delete k tr
     delete k (node {lh = _} {suc rh} k₁ v ◿ tl tr) | tri> ¬a ¬b c | 0+ tr′ = rotʳ k₁ v tl tr′
