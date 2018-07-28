@@ -5,3 +5,9 @@
 *.log
 *.ptb
 *.tex
+*.el
+*.bbl
+*.bcf
+*.blg
+*.xml
+*.toc
