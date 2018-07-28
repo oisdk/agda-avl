@@ -13,6 +13,8 @@
 \DeclareUnicodeCharacter{9722}{\ensuremath{\mathbin{\rotatebox[origin=c]{135}{$\dotminus$}}}}
 \DeclareUnicodeCharacter{9041}{\ensuremath{1}}
 \DeclareUnicodeCharacter{9014}{\ensuremath{{}^{⊤}_{⊥}}}
+\DeclareUnicodeCharacter{737}{\ensuremath{^{l}}}
+\DeclareUnicodeCharacter{691}{\ensuremath{^{r}}}
 
 \usepackage[utf8x]{inputenc}
 \usepackage{autofe}
@@ -108,15 +110,15 @@ $\rightarrow$
   [$v$[$a$][$u$[$b$][$c$]]]
 \end{forest}
 \begin{code}
-    rot-r  : ∀ {lb ub rh v} {V : Key → Set v}
-           → (k : Key)
-           → V k
-           → Tree V lb [ k ] (suc (suc rh))
-           → Tree V [ k ] ub rh
-           → Inserted V lb ub (suc (suc rh))
-    rot-r u uc (node v vc ◿  ta tb) tc = same  (node v vc ▽  ta (node u uc ▽  tb tc))
-    rot-r u uc (node v vc ▽  ta tb) tc = chng  (node v vc ◺  ta (node u uc ◿  tb tc))
-    rot-r u uc (node v vc ◺  ta (node w wc bw tb tc)) td =
+    rotʳ  : ∀ {lb ub rh v} {V : Key → Set v}
+          → (k : Key)
+          → V k
+          → Tree V lb [ k ] (suc (suc rh))
+          → Tree V [ k ] ub rh
+          → Inserted V lb ub (suc (suc rh))
+    rotʳ u uc (node v vc ◿  ta tb) tc = same  (node v vc ▽  ta (node u uc ▽  tb tc))
+    rotʳ u uc (node v vc ▽  ta tb) tc = chng  (node v vc ◺  ta (node u uc ◿  tb tc))
+    rotʳ u uc (node v vc ◺  ta (node w wc bw tb tc)) td =
       same (node w wc ▽ (node v vc (◺⇒◿ bw) ta tb) (node u uc (◿⇒◺ bw) tc td))
 \end{code}
 \centering
@@ -128,15 +130,15 @@ $\rightarrow$
   [$v$[$u$[$c$][$b$]][$a$]]
 \end{forest}
 \begin{code}
-    rot-l  : ∀ {lb ub lh v} {V : Key → Set v}
-           → (k : Key)
-           → V k
-           → Tree V lb [ k ] lh
-           → Tree V [ k ] ub (suc (suc lh))
-           → Inserted V lb ub (suc (suc lh))
-    rot-l u uc tc (node v vc  ◺  tb ta) = same  (node v vc  ▽  (node u uc  ▽  tc tb) ta)
-    rot-l u uc tc (node v vc  ▽  tb ta) = chng  (node v vc  ◿  (node u uc  ◺  tc tb) ta)
-    rot-l u uc td (node v vc  ◿  (node w wc bw tc tb) ta) =
+    rotˡ  : ∀ {lb ub lh v} {V : Key → Set v}
+          → (k : Key)
+          → V k
+          → Tree V lb [ k ] lh
+          → Tree V [ k ] ub (suc (suc lh))
+          → Inserted V lb ub (suc (suc lh))
+    rotˡ u uc tc (node v vc  ◺  tb ta) = same  (node v vc  ▽  (node u uc  ▽  tc tb) ta)
+    rotˡ u uc tc (node v vc  ▽  tb ta) = chng  (node v vc  ◿  (node u uc  ◺  tc tb) ta)
+    rotˡ u uc td (node v vc  ◿  (node w wc bw tc tb) ta) =
       same (node w wc ▽ (node u uc (◺⇒◿ bw) td tc) (node v vc (◿⇒◺ bw) tb ta))
 \end{code}
 \begin{code}
@@ -152,7 +154,7 @@ $\rightarrow$
        | tri< a _ _ with insert v vc f tl (l , a)
     ...   | same tl′ = same (node k kc bl tl′ tr)
     ...   | chng tl′ with bl
-    ...      |  ◿  = rot-r k kc tl′ tr
+    ...      |  ◿  = rotʳ k kc tl′ tr
     ...      |  ▽  = chng  (node k kc  ◿  tl′ tr)
     ...      |  ◺  = same  (node k kc  ▽  tl′ tr)
     insert v vc f (node k kc bl tl tr) _
@@ -163,7 +165,7 @@ $\rightarrow$
     ...   | chng tr′ with bl
     ...      |  ◿  = same  (node k kc  ▽  tl tr′)
     ...      |  ▽  = chng  (node k kc  ◺  tl tr′)
-    ...      |  ◺  = rot-l k kc tl tr′
+    ...      |  ◺  = rotˡ k kc tl tr′
 \end{code}
 \begin{code}
     lookup  : (k : Key)
