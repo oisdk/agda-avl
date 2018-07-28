@@ -8,6 +8,7 @@
 \usepackage{graphicx}
 
 \DeclareUnicodeCharacter{9034}{\ensuremath{0}}
+\DeclareUnicodeCharacter{8343}{\ensuremath{_l}}
 \DeclareUnicodeCharacter{9661}{\ensuremath{\mathbin{\rotatebox[origin=c]{180}{$\dotminus$}}}}
 \DeclareUnicodeCharacter{9727}{\ensuremath{\mathbin{\rotatebox[origin=c]{225}{$\dotminus$}}}}
 \DeclareUnicodeCharacter{9722}{\ensuremath{\mathbin{\rotatebox[origin=c]{135}{$\dotminus$}}}}
@@ -222,14 +223,14 @@ $\rightarrow$
           → (∀ {lb′} → Altered V [ lb′ ] ub h → Altered V [ lb′ ] ub′ h′)
           → Uncons V lb ub′ h′
       go k v ▽ (leaf l<u) tr c = uncons k v l<u (c (0+ tr))
-      go k v ▽ (node k₁ v₁ bl tl₁ tr₁) tr c = go k₁ v₁ bl tl₁ tr₁
+      go k v ▽ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
         λ { (0+ tl′) → c (1+ (node k v ◺ tl′ tr))
           ; (1+ tl′) → c (1+ (node k v ▽ tl′ tr)) }
       go k v ◺ (leaf l<u) tr c = uncons k v l<u (c (0+ tr))
-      go k v ◺ (node k₁ v₁ bl tl₁ tr₁) tr c = go k₁ v₁ bl tl₁ tr₁
+      go k v ◺ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
         λ { (0+ tl′) → c (rotˡ k v tl′ tr)
           ; (1+ tl′) → c (1+ (node k v ◺ tl′ tr)) }
-      go k v ◿ (node k₁ v₁ bl tl₁ tr₁) tr c = go k₁ v₁ bl tl₁ tr₁
+      go k v ◿ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
         λ { (0+ tl′) → c (0+ (node k v ▽ tl′ tr))
           ; (1+ tl′) → c (1+ (node k v ◿ tl′ tr))}
 
@@ -245,27 +246,28 @@ $\rightarrow$
            → Tree V lb ub (suc h)
            → Altered V lb ub h
     delete k (node k₁ v bl tl tr) with compare k k₁
-    delete k (node {lh = zero} k₁ v bl tl tr)   | tri< a ¬b ¬c = 1+ (node k₁ v bl tl tr)
-    delete k (node {lh = suc lh} k₁ v bl tl tr) | tri< a ¬b ¬c with delete k tl | bl
+    delete k (node {lh = zero}    k₁ v bl tl tr) | tri< a ¬b ¬c = 1+ (node k₁ v bl tl tr)
+    delete k (node {lh = suc lh}  k₁ v bl tl tr) | tri< a ¬b ¬c with delete k tl | bl
     ... | 0+ tl′ | ◿ = 0+ (node k₁ v ▽ tl′ tr)
     ... | 0+ tl′ | ▽ = 1+ (node k₁ v ◺ tl′ tr)
     ... | 0+ tl′ | ◺ = rotˡ k₁ v tl′ tr
     ... | 1+ tl′ | _ = 1+ (node k₁ v bl tl′ tr)
-    delete k₁ (node {rh = zero} k₁ v ◿ tl (leaf l<u)) | tri≈ ¬a refl ¬c = 0+ (widen l<u tl)
-    delete {lb} k₁ (node {rh = zero} k₁ v ▽ (leaf l<u) (leaf l<u₁)) | tri≈ ¬a refl ¬c = 0+ (leaf (⌶<-trans {lb} l<u l<u₁))
+    delete {lb} k₁ (node {rh = zero} k₁ v bl tl (leaf k₁<ub)) | tri≈ ¬a refl ¬c with bl | tl
+    ... | ◿ | _ = 0+ (widen k₁<ub tl)
+    ... | ▽ | leaf lb<k₁ = 0+ (leaf (⌶<-trans {lb} lb<k₁ k₁<ub))
     delete k₁ (node {rh = suc rh} k₁ v bl tl (node k v₁ bl₁ tr tr₁)) | tri≈ ¬a refl ¬c with bl | uncons′ k v₁ bl₁ tr tr₁
-    ... | ◿ | uncons k′ v′ l<u (0+ tr′) = rotʳ k′ v′ (widen l<u tl) tr′
-    ... | ◿ | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ◿ (widen l<u tl) tr′)
-    ... | ▽ | uncons k′ v′ l<u (0+ tr′) = 1+ (node k′ v′ ◿ (widen l<u tl) tr′)
-    ... | ▽ | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ▽ (widen l<u tl) tr′)
-    ... | ◺ | uncons k′ v′ l<u (0+ tr′) = 0+ (node k′ v′ ▽ (widen l<u tl) tr′)
-    ... | ◺ | uncons k′ v′ l<u (1+ tr′) = 1+ (node k′ v′ ◺ (widen l<u tl) tr′)
-    delete k (node {rh = zero} k₁ v bl tl tr) | tri> ¬a ¬b c = 1+ (node k₁ v bl tl tr)
+    ... | ◿  | uncons k′ v′ l<u (0+  tr′) = rotʳ k′ v′ (widen l<u tl) tr′
+    ... | ◿  | uncons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ◿  (widen l<u tl) tr′)
+    ... | ▽  | uncons k′ v′ l<u (0+  tr′) = 1+ (node k′ v′ ◿  (widen l<u tl) tr′)
+    ... | ▽  | uncons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ▽  (widen l<u tl) tr′)
+    ... | ◺  | uncons k′ v′ l<u (0+  tr′) = 0+ (node k′ v′ ▽  (widen l<u tl) tr′)
+    ... | ◺  | uncons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ◺  (widen l<u tl) tr′)
+    delete k (node {rh = zero} k₁ v bl tl tr)   | tri> ¬a ¬b c = 1+ (node k₁ v bl tl tr)
     delete k (node {rh = suc rh} k₁ v bl tl tr) | tri> ¬a ¬b c with delete k tr | bl
-    ... | 0+ tr′ | ◿ = rotʳ k₁ v tl tr′
-    ... | 0+ tr′ | ▽ = 1+ (node k₁ v ◿ tl tr′)
-    ... | 0+ tr′ | ◺ = 0+ (node k₁ v ▽ tl tr′)
-    ... | 1+ tr′ | _ = 1+ (node k₁ v bl tl tr′)
+    ... | 0+ tr′  | ◿  = rotʳ k₁ v tl tr′
+    ... | 0+ tr′  | ▽  = 1+ (node k₁ v ◿ tl tr′)
+    ... | 0+ tr′  | ◺  = 0+ (node k₁ v ▽ tl tr′)
+    ... | 1+ tr′  | _  = 1+ (node k₁ v bl tl tr′)
 
   module DependantMap where
     data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
