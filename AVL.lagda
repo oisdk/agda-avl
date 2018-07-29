@@ -6,6 +6,7 @@
 \usepackage{MnSymbol}
 \usepackage{ucs}
 \usepackage{graphicx}
+\usepackage{fdsymbol}
 
 \DeclareUnicodeCharacter{9034}{\ensuremath{0}}
 \DeclareUnicodeCharacter{8343}{\ensuremath{_l}}
@@ -17,6 +18,8 @@
 \DeclareUnicodeCharacter{9014}{\ensuremath{{}^{⊤}_{⊥}}}
 \DeclareUnicodeCharacter{737}{\ensuremath{^{l}}}
 \DeclareUnicodeCharacter{691}{\ensuremath{^{r}}}
+\DeclareUnicodeCharacter{8405}{\ensuremath{\minusrdots}}
+\DeclareUnicodeCharacter{8404}{\ensuremath{\minusfdots}}
 
 \usepackage[utf8x]{inputenc}
 \usepackage{autofe}
@@ -51,7 +54,7 @@ open import Data.Bool
 open import Data.Empty renaming (⊥ to ⍊)
 \end{code}
 
-Next, We declare a module: the entirety of the following code is
+Next, we declare a module: the entirety of the following code is
 parameterized over the \emph{key} type, and a strict total order on
 that key.
 \begin{code}
@@ -122,15 +125,15 @@ later.
 
 We will also need some combinators for balance:
 \begin{code}
-    ◺⇒◿ : ∀ {x y z} → ⟨ x ⊔ y ⟩≡ z → ⟨ z ⊔ x ⟩≡ z
-    ◺⇒◿  ◿   = ▽
-    ◺⇒◿  ▽   = ▽
-    ◺⇒◿  ◺   = ◿
+    ⃕ : ∀ {x y z} → ⟨ x ⊔ y ⟩≡ z → ⟨ z ⊔ x ⟩≡ z
+    ⃕  ◿   = ▽
+    ⃕  ▽   = ▽
+    ⃕  ◺   = ◿
 
-    ◿⇒◺ : ∀ {x y z} →  ⟨ x ⊔ y ⟩≡ z → ⟨ y ⊔ z ⟩≡ z
-    ◿⇒◺  ◿   = ◺
-    ◿⇒◺  ▽   = ▽
-    ◿⇒◺  ◺   = ▽
+    ⃔ : ∀ {x y z} →  ⟨ x ⊔ y ⟩≡ z → ⟨ y ⊔ z ⟩≡ z
+    ⃔  ◿   = ◺
+    ⃔  ▽   = ▽
+    ⃔  ◺   = ▽
 \end{code}
 \section{The Tree Type}
 The type itself is indexed by the lower and upper bounds, some
@@ -178,9 +181,11 @@ rotation can be seen in figure~\ref{rightsingle}.
 \begin{figure}[h]
   \centering
   \begin{forest}
-      [ $x$ [ $y$ [ $a$ ]
-                  [ $b$ ]]
-            [ $c$ ]]
+      [ $x$, AgdaInductiveConstructor
+            [ $y$, AgdaInductiveConstructor
+                  [ $a$, AgdaField ]
+                  [ $b$, AgdaField ]]
+            [ $c$, AgdaField ]]
   \end{forest}
   \raisebox{1cm}{
     \begin{tikzpicture}
@@ -188,9 +193,11 @@ rotation can be seen in figure~\ref{rightsingle}.
     \end{tikzpicture}
   }
   \begin{forest}
-      [ $y$ [$a$]
-            [ $x$ [ $b$ ]
-                  [ $c$ ]]]
+      [ $y$, AgdaInductiveConstructor
+            [ $a$, AgdaField ]
+            [ $x$, AgdaInductiveConstructor
+                  [ $b$, AgdaField ]
+                  [ $c$, AgdaField ]]]
   \end{forest}
   \caption{Single right-rotation}
   \label{rightsingle}
@@ -203,11 +210,13 @@ And double rotation in figure~\ref{rightdouble}.
 \begin{figure}[h]
   \centering
   \begin{forest}
-      [ $x$ [ $y$ [ $a$ ]
-                  [ $z$ [ $b$ ]
-                        [ $c$ ]]]
-            [ $d$ ]
-      ]
+      [ $x$, AgdaInductiveConstructor
+            [ $y$, AgdaInductiveConstructor
+                  [ $a$, AgdaField ]
+                  [ $z$, AgdaInductiveConstructor
+                        [ $b$, AgdaField ]
+                        [ $c$, AgdaField ]]]
+            [ $d$, AgdaField ]]
   \end{forest}
   \raisebox{1cm}{
     \begin{tikzpicture}
@@ -215,18 +224,20 @@ And double rotation in figure~\ref{rightdouble}.
     \end{tikzpicture}
   }
   \begin{forest}
-      [ $z$ [ $y$ [ $a$ ]
-                  [ $b$ ]]
-            [ $x$ [ $c$ ]
-                  [ $d$ ]]
-      ]
+      [ $z$, AgdaInductiveConstructor
+            [ $y$, AgdaInductiveConstructor
+                  [ $a$, AgdaField ]
+                  [ $b$, AgdaField ]]
+            [ $x$, AgdaInductiveConstructor
+                  [ $c$, AgdaField ]
+                  [ $d$, AgdaField ]]]
   \end{forest}
   \caption{Double right-rotation}
   \label{rightdouble}
 \end{figure}
 \begin{code}
     rotʳ x xv (node y yv ◺  a (node z zv bl b c)) d =
-      0+ (node z zv ▽ (node y yv (◺⇒◿ bl) a b) (node x xv (◿⇒◺ bl) c d))
+      0+ (node z zv ▽ (node y yv (⃕ bl) a b) (node x xv (⃔ bl) c d))
 \end{code}
 \subsection{Left Rotation}
 Left-rotation is essentially the inverse of right.
@@ -241,7 +252,11 @@ Left-rotation is essentially the inverse of right.
 \begin{figure}[h!]
   \centering
   \begin{forest}
-    [$x$[$c$][$y$[$b$][$a$]]]
+    [ $x$, AgdaInductiveConstructor
+           [ $c$, AgdaField ]
+           [ $y$, AgdaInductiveConstructor
+                  [ $b$, AgdaField ]
+                  [ $a$, AgdaField ]]]
   \end{forest}
   \raisebox{1cm}{
     \begin{tikzpicture}
@@ -249,11 +264,16 @@ Left-rotation is essentially the inverse of right.
     \end{tikzpicture}
   }
   \begin{forest}
-    [$y$[$x$[$c$][$b$]][$a$]]
+    [ $y$, AgdaInductiveConstructor
+           [ $x$, AgdaInductiveConstructor
+                  [ $c$, AgdaField ]
+                  [ $b$, AgdaField ]]
+           [ $a$, AgdaField ]]
   \end{forest}
   \caption{Single left-rotation}
+  \label{leftsingle}
 \end{figure}
-Single:
+Single (seen in figure~\ref{leftsingle}).
 \begin{code}
     rotˡ x xv c (node y yv  ◺  b a) = 0+  (node y yv  ▽  (node x xv  ▽  c b) a)
     rotˡ x xv c (node y yv  ▽  b a) = 1+  (node y yv  ◿  (node x xv  ◺  c b) a)
@@ -261,12 +281,13 @@ Single:
 \begin{figure}[h!]
   \centering
   \begin{forest}
-    [ $x$ [ $d$ ]
-          [ $y$ [ $z$ [ $c$ ]
-                      [ $b$ ]]
-                [ $a$ ]
-          ]
-    ]
+    [ $x$, AgdaInductiveConstructor
+          [ $d$, AgdaField ]
+          [ $y$, AgdaInductiveConstructor
+                [ $z$, AgdaInductiveConstructor
+                      [ $c$, AgdaField ]
+                      [ $b$, AgdaField ]]
+                [ $a$, AgdaField ]]]
   \end{forest}
   \raisebox{1cm}{
     \begin{tikzpicture}
@@ -274,16 +295,22 @@ Single:
     \end{tikzpicture}
   }
   \begin{forest}
-    [ $z$ [ $x$ [$d$] [$c$] ]
-          [ $y$ [$b$] [$a$] ]
+    [ $z$, AgdaInductiveConstructor
+          [ $x$, AgdaInductiveConstructor
+                [ $d$, AgdaField ]
+                [ $c$, AgdaField ]]
+          [ $y$, AgdaInductiveConstructor
+                [ $b$, AgdaField ]
+                [ $a$, AgdaField ]]
     ]
   \end{forest}
   \caption{Double left-rotation}
+  \label{leftdouble}
 \end{figure}
-and double:
+and double (figure~\ref{leftdouble}):
 \begin{code}
     rotˡ x xv d (node y yv  ◿  (node z zv bl c b) a) =
-      0+ (node z zv ▽ (node x xv (◺⇒◿ bl) d c) (node y yv (◿⇒◺ bl) b a))
+      0+ (node z zv ▽ (node x xv (⃕ bl) d c) (node y yv (⃔ bl) b a))
 \end{code}
 \section{Insertion}
 After the rotations, insertion is relatively easy. We allow the caller
