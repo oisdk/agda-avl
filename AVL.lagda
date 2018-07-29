@@ -155,11 +155,9 @@ performed as correction.
 Before we implement the rotations, we need a type to describe a tree
 whose height may have changed:
 \begin{code}
-    Altered : ∀ {v} (V : Key → Set v) (l u : ⌶) (n : ℕ) → Set (k ⊔ v ⊔ r)
-    Altered V l u n = ∃[ inc ] (Tree V l u (if inc then suc n else n))
-
-    pattern 0+  tr = false  , tr
-    pattern 1+  tr = true   , tr
+    data Inserted {v} (V : Key → Set v) (l u : ⌶) (n : ℕ) : Set (k ⊔ v ⊔ r) where
+      0+_ : Tree V l u n → Inserted V l u n
+      1+_ : Tree V l u (suc n) → Inserted V l u n
 \end{code}
 \subsection{Right Rotation}
 When the left subtree becomes too heavy, we rotate the tree to the
@@ -170,7 +168,7 @@ right.
           → V k
           → Tree V lb [ k ] (suc (suc rh))
           → Tree V [ k ] ub rh
-          → Altered V lb ub (suc (suc rh))
+          → Inserted V lb ub (suc (suc rh))
 \end{code}
 This rotation comes in two varieties: single and double. Single
 rotation can be seen in figure~\ref{rightsingle}.
@@ -235,7 +233,7 @@ Left-rotation is essentially the inverse of right.
           → V k
           → Tree V lb [ k ] lh
           → Tree V [ k ] ub (suc (suc lh))
-          → Altered V lb ub (suc (suc lh))
+          → Inserted V lb ub (suc (suc lh))
 \end{code}
 \begin{figure}[h!]
   \centering
@@ -293,7 +291,7 @@ to supply a combining function.
              → (V k → V k → V k)
              → Tree V l u h
              → l < k < u
-             → Altered V l u h
+             → Inserted V l u h
     insert v vc f (leaf l<u) (l , u) = 1+ (node v vc ▽ (leaf l) (leaf u))
     insert v vc f (node k kc bl tl tr) prf with compare v k
     insert v vc f (node k kc bl tl tr) (l , _)
@@ -337,6 +335,14 @@ First then, we need to define ``uncons''. We'll use a custom type as
 the return type from our uncons function, which stores the minimum
 element from the tree, and the rest of the tree:
 \begin{code}
+    data Deleted {v} (V : Key → Set v) (lb ub : ⌶) : ℕ → Set (k ⊔ v ⊔ r) where
+      _−0 : ∀ {n} → Tree V lb ub n → Deleted V lb ub n
+      _−1 : ∀ {n} → Tree V lb ub n → Deleted V lb ub (suc n)
+
+    deleted : ∀ {v} {V : Key → Set v} {lb ub n} → Inserted V lb ub n → Deleted V lb ub (suc n)
+    deleted (0+ x) = x −1
+    deleted (1+ x) = x −0
+
     record Cons {v}
                 (V : Key → Set v)
                 (lb ub : ⌶)
@@ -346,7 +352,7 @@ element from the tree, and the rest of the tree:
         head  : Key
         val   : V head
         l<u   : lb ⌶< [ head ]
-        tail  : Altered V [ head ] ub h
+        tail  : Deleted V [ head ] ub h
 \end{code}
 You'll notice it also stores a proof that the extracted element
 preserves the lower bound.
@@ -359,7 +365,7 @@ The uncons function itself is written in a continuation-passing style.
             → ⟨ lh ⊔ rh ⟩≡ h
             → Tree V lb [ k ] lh
             → Tree V [ k ] ub rh
-            → Cons V lb ub h
+            → Cons V lb ub (suc h)
     uncons k v bl tl tr = go k v bl tl tr id
       where
       go  : ∀ {lb ub h lh rh v ub′ h′} {V : Key → Set v}
@@ -368,19 +374,19 @@ The uncons function itself is written in a continuation-passing style.
           → ⟨ lh ⊔ rh ⟩≡ h
           → Tree V lb [ k ] lh
           → Tree V [ k ] ub rh
-          → (∀ {lb′} → Altered V [ lb′ ] ub h → Altered V [ lb′ ] ub′ h′)
-          → Cons V lb ub′ h′
-      go k v ▽ (leaf l<u) tr c = cons k v l<u (c (0+ tr))
+          → (∀ {lb′} → Deleted V [ lb′ ] ub (suc h) → Deleted V [ lb′ ] ub′ (suc h′))
+          → Cons V lb ub′ (suc h′)
+      go k v ▽ (leaf l<u) tr c = cons k v l<u (c (tr −1))
       go k v ▽ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
-        λ  {  (0+ tl′) → c (1+ (node k v ◺  tl′ tr))
-           ;  (1+ tl′) → c (1+ (node k v ▽  tl′ tr)) }
-      go k v ◺ (leaf l<u) tr c = cons k v l<u (c (0+ tr))
+        λ  {  (tl′ −1) → c ((node k v ◺  tl′ tr) −0)
+           ;  (tl′ −0) → c ((node k v ▽  tl′ tr) −0) }
+      go k v ◺ (leaf l<u) tr c = cons k v l<u (c (tr −1))
       go k v ◺ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
-        λ  {  (0+ tl′) → c (rotˡ k v tl′ tr)
-           ;  (1+ tl′) → c (1+ (node k v ◺ tl′ tr)) }
+        λ  {  (tl′ −1) → c (deleted (rotˡ k v tl′ tr))
+           ;  (tl′ −0) → c ((node k v ◺ tl′ tr) −0) }
       go k v ◿ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
-        λ  {  (0+ tl′) → c (0+ (node k v ▽  tl′ tr))
-           ;  (1+ tl′) → c (1+ (node k v ◿  tl′ tr))}
+        λ  {  (tl′ −1) → c ((node k v ▽  tl′ tr) −1)
+           ;  (tl′ −0) → c ((node k v ◿  tl′ tr) −0)}
 \end{code}
 \subsection{Widening}
 To join the two subtrees together after a deletion operation, we need
@@ -394,16 +400,16 @@ For the widening, we'll need some properties on orderings:
     x≮⊥ {⊤}      = lift ∘ lower
     x≮⊥ {[ _ ]}  = lift ∘ lower
 
-    ⌶<-trans : ∀ {x y z} → x ⌶< y → y ⌶< z → x ⌶< z
-    ⌶<-trans {⊥}      {y}      {⊥}      _    y<z  = x≮⊥ {x = y} y<z
-    ⌶<-trans {⊥}      {_}      {⊤}      _    _    = _
-    ⌶<-trans {⊥}      {_}      {[ _ ]}  _    _    = _
-    ⌶<-trans {⊤}      {_}      {_}      (lift ()) _
-    ⌶<-trans {[ _ ]}  {y}      {⊥}      _    y<z  = x≮⊥ {x = y} y<z
-    ⌶<-trans {[ _ ]}  {_}      {⊤}      _    _    = _
-    ⌶<-trans {[ _ ]}  {⊥}      {[ _ ]}  (lift ()) _
-    ⌶<-trans {[ _ ]}  {⊤}      {[ _ ]}  _ (lift ())
-    ⌶<-trans {[ x ]}  {[ y ]}  {[ z ]}  x<y  y<z  =
+    ⌶<-trans : ∀ x {y z} → x ⌶< y → y ⌶< z → x ⌶< z
+    ⌶<-trans ⊥      {y}      {⊥}      _    y<z  = x≮⊥ {x = y} y<z
+    ⌶<-trans ⊥      {_}      {⊤}      _    _    = _
+    ⌶<-trans ⊥      {_}      {[ _ ]}  _    _    = _
+    ⌶<-trans ⊤      {_}      {_}      (lift ()) _
+    ⌶<-trans [ _ ]  {y}      {⊥}      _    y<z  = x≮⊥ {x = y} y<z
+    ⌶<-trans [ _ ]  {_}      {⊤}      _    _    = _
+    ⌶<-trans [ _ ]  {⊥}      {[ _ ]}  (lift ()) _
+    ⌶<-trans [ _ ]  {⊤}      {[ _ ]}  _ (lift ())
+    ⌶<-trans [ x ]  {[ y ]}  {[ z ]}  x<y  y<z  =
       IsStrictTotalOrder.trans isStrictTotalOrder x<y y<z
 \end{code}
 Finally, the widen function itself simply walks down the right branch
@@ -413,7 +419,7 @@ of the tree until it hits a leaf.
          → ub ⌶< ub′
          → Tree V lb ub h
          → Tree V lb ub′ h
-    widen {lb} ub<ub′ (leaf l<u) = leaf (⌶<-trans {lb} l<u ub<ub′)
+    widen {lb} ub<ub′ (leaf l<u) = leaf (⌶<-trans lb l<u ub<ub′)
     widen ub<ub′ (node k v bl tl tr) = node k v bl tl (widen ub<ub′ tr)
 \end{code}
 \subsection{Full Deletion}
@@ -422,32 +428,31 @@ correct complexity bounds.
 \begin{code}
     delete : ∀ {lb ub h v} {V : Key → Set v}
            → (k : Key)
-           → Tree V lb ub (suc h)
-           → Altered V lb ub h
+           → Tree V lb ub h
+           → Deleted V lb ub h
+    delete _ (leaf l<u) = leaf l<u −0
     delete k (node k₁ v bl tl tr) with compare k k₁
-    delete k (node {lh = zero}    k₁ v bl tl tr) | tri< _ _ _ = 1+ (node k₁ v bl tl tr)
-    delete k (node {lh = suc lh}  k₁ v bl tl tr) | tri< _ _ _ with delete k tl | bl
-    ... | 0+ tl′ | ◿  = 0+ (node k₁ v ▽ tl′ tr)
-    ... | 0+ tl′ | ▽  = 1+ (node k₁ v ◺ tl′ tr)
-    ... | 0+ tl′ | ◺  = rotˡ k₁ v tl′ tr
-    ... | 1+ tl′ | _  = 1+ (node k₁ v bl tl′ tr)
-    delete {lb} k (node {rh = zero} k v bl tl (leaf k<ub)) | tri≈ _ refl _ with bl | tl
-    ... | ◿  | _ = 0+ (widen k<ub tl)
-    ... | ▽  | leaf lb<k = 0+ (leaf (⌶<-trans {lb} lb<k k<ub))
-    delete k (node {rh = suc rh} k v bl tl (node kᵣ vᵣ blᵣ tlᵣ trᵣ)) | tri≈ _ refl _
+    delete k (node k₁ v bl tl tr) | tri< _ _ _ with delete k tl | bl
+    ... | tl′ −1 | ◿  = (node k₁ v ▽ tl′ tr) −1
+    ... | tl′ −1 | ▽  = (node k₁ v ◺ tl′ tr) −0
+    ... | tl′ −1 | ◺  = deleted (rotˡ k₁ v tl′ tr)
+    ... | tl′ −0 | _  = (node k₁ v bl tl′ tr) −0
+    delete {lb} k (node k v bl tl (leaf k<ub)) | tri≈ _ refl _ with bl | tl
+    ... | ◿  | _ = (widen k<ub tl) −1
+    ... | ▽  | leaf lb<k = (leaf (⌶<-trans lb lb<k k<ub)) −1
+    delete k (node k v bl tl (node kᵣ vᵣ blᵣ tlᵣ trᵣ)) | tri≈ _ refl _
       with bl | uncons kᵣ vᵣ blᵣ tlᵣ trᵣ
-    ... | ◿  | cons k′ v′ l<u (0+  tr′) = rotʳ k′ v′ (widen l<u tl) tr′
-    ... | ◿  | cons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ◿  (widen l<u tl) tr′)
-    ... | ▽  | cons k′ v′ l<u (0+  tr′) = 1+ (node k′ v′ ◿  (widen l<u tl) tr′)
-    ... | ▽  | cons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ▽  (widen l<u tl) tr′)
-    ... | ◺  | cons k′ v′ l<u (0+  tr′) = 0+ (node k′ v′ ▽  (widen l<u tl) tr′)
-    ... | ◺  | cons k′ v′ l<u (1+  tr′) = 1+ (node k′ v′ ◺  (widen l<u tl) tr′)
-    delete k (node {rh = zero} k₁ v bl tl tr)   | tri> _ ¬b c = 1+ (node k₁ v bl tl tr)
-    delete k (node {rh = suc rh} k₁ v bl tl tr) | tri> _ ¬b c with delete k tr | bl
-    ... | 0+ tr′  | ◿  = rotʳ k₁ v tl tr′
-    ... | 0+ tr′  | ▽  = 1+ (node k₁ v ◿ tl tr′)
-    ... | 0+ tr′  | ◺  = 0+ (node k₁ v ▽ tl tr′)
-    ... | 1+ tr′  | _  = 1+ (node k₁ v bl tl tr′)
+    ... | ◿  | cons k′ v′ l<u (tr′ −1) = deleted (rotʳ k′ v′ (widen l<u tl) tr′)
+    ... | ◿  | cons k′ v′ l<u (tr′ −0) = (node k′ v′ ◿  (widen l<u tl) tr′) −0
+    ... | ▽  | cons k′ v′ l<u (tr′ −1) = (node k′ v′ ◿  (widen l<u tl) tr′) −0
+    ... | ▽  | cons k′ v′ l<u (tr′ −0) = (node k′ v′ ▽  (widen l<u tl) tr′) −0
+    ... | ◺  | cons k′ v′ l<u (tr′ −1) = (node k′ v′ ▽  (widen l<u tl) tr′) −1
+    ... | ◺  | cons k′ v′ l<u (tr′ −0) = (node k′ v′ ◺  (widen l<u tl) tr′) −0
+    delete k (node k₁ v bl tl tr) | tri> _ _ _ with delete k tr | bl
+    ... | tr′ −1  | ◿  = deleted (rotʳ k₁ v tl tr′)
+    ... | tr′ −1  | ▽  = (node k₁ v ◿ tl tr′) −0
+    ... | tr′ −1  | ◺  = (node k₁ v ▽ tl tr′) −1
+    ... | tr′ −0  | _  = (node k₁ v bl tl tr′) −0
 \end{code}
 \section{Packaging}
 Users don't need to be exposed to the indices on the full tree type:
@@ -464,7 +469,9 @@ here, we package it in thee forms.
                 → Map V
                 → Map V
     insertWith k v f (tree tr) =
-      tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
+       case Bounded.insert k v f tr (lift tt , lift tt) of
+         λ { (Bounded.1+ tr) → tree tr
+           ; (Bounded.0+ tr) → tree tr }
 
     insert : ∀ {v} {V : Key → Set v} (k : Key) → V k → Map V → Map V
     insert k v = insertWith k v const
@@ -473,10 +480,9 @@ here, we package it in thee forms.
     lookup k (tree tr) = Bounded.lookup k tr
 
     delete : (k : Key) → ∀ {v} {V : Key → Set v} → Map V → Map V
-    delete k (tree {zero} tr) = tree tr
-    delete k (tree {suc h} tr) with (Bounded.delete k tr)
-    ... | Bounded.0+ tr′ = tree tr′
-    ... | Bounded.1+ tr′ = tree tr′
+    delete k (tree tr) with Bounded.delete k tr
+    ... | tr′ Bounded.−0 = tree tr′
+    ... | tr′ Bounded.−1 = tree tr′
 \end{code}
 \subsection{Non-Dependent (Simple) Map}
 \begin{code}
@@ -486,7 +492,9 @@ here, we package it in thee forms.
 
     insertWith : ∀ {v} {V : Set v} (k : Key) → V → (V → V → V) → Map V → Map V
     insertWith k v f (tree tr) =
-      tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
+      case Bounded.insert k v f tr (lift tt , lift tt) of
+        λ { (Bounded.0+ tr) → tree tr
+          ; (Bounded.1+ tr) → tree tr}
 
     insert : ∀ {v} {V : Set v} (k : Key) → V → Map V → Map V
     insert k v = insertWith k v const
@@ -494,11 +502,11 @@ here, we package it in thee forms.
     lookup : (k : Key) → ∀ {v} {V : Set v} → Map V → Maybe V
     lookup k (tree tr) = Bounded.lookup k tr
 
-    delete : (k : Key) → ∀ {v} {V : Set v} → Map V → Map V
-    delete k (tree {zero} tr) = tree tr
-    delete k (tree {suc h} tr) with (Bounded.delete k tr)
-    ... | Bounded.0+ tr′ = tree tr′
-    ... | Bounded.1+ tr′ = tree tr′
+    -- delete : (k : Key) → ∀ {v} {V : Set v} → Map V → Map V
+    -- delete k (tree {zero} tr) = tree tr
+    -- delete k (tree {suc h} tr) with (Bounded.delete k tr)
+    -- ... | Bounded.0+ tr′ = tree tr′
+    -- ... | Bounded.1+ tr′ = tree tr′
 \end{code}
 \subsection{Set}
 Note that we can't call the type itself ``Set'', as that's a reserved
@@ -510,16 +518,18 @@ word in Agda.
 
     insert : Key → ⟨Set⟩ → ⟨Set⟩
     insert k (tree tr) =
-      tree (proj₂ (Bounded.insert k tt const tr (lift tt , lift tt)))
+      case Bounded.insert k tt const tr (lift tt , lift tt) of
+        λ { (Bounded.0+ tr) → tree tr
+          ; (Bounded.1+ tr) → tree tr}
 
     member : Key → ⟨Set⟩ → Bool
     member k (tree tr) = is-just (Bounded.lookup k tr)
 
-    delete : (k : Key) → ⟨Set⟩ → ⟨Set⟩
-    delete k (tree {zero} tr) = tree tr
-    delete k (tree {suc h} tr) with (Bounded.delete k tr)
-    ... | Bounded.0+ tr′ = tree tr′
-    ... | Bounded.1+ tr′ = tree tr′
+    -- delete : (k : Key) → ⟨Set⟩ → ⟨Set⟩
+    -- delete k (tree {zero} tr) = tree tr
+    -- delete k (tree {suc h} tr) with (Bounded.delete k tr)
+    -- ... | Bounded.0+ tr′ = tree tr′
+    -- ... | Bounded.1+ tr′ = tree tr′
 \end{code}
 \bibliographystyle{IEEEtranS}
 \bibliography{../AVL.bib}
