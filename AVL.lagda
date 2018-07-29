@@ -37,6 +37,8 @@
 \section{Introduction}
 First, some imports.
 \begin{code}
+{-# OPTIONS --without-K #-}
+
 open import Relation.Binary
 open import Relation.Binary.PropositionalEquality
 open import Level using (Lift; lift; _⊔_; lower)
@@ -155,9 +157,10 @@ performed as correction.
 Before we implement the rotations, we need a type to describe a tree
 whose height may have changed:
 \begin{code}
-    data Inserted {v} (V : Key → Set v) (l u : ⌶) (n : ℕ) : Set (k ⊔ v ⊔ r) where
-      0+_ : Tree V l u n → Inserted V l u n
-      1+_ : Tree V l u (suc n) → Inserted V l u n
+    Inserted : ∀ {v} (V : Key → Set v) (l u : ⌶) (n : ℕ) → Set (k ⊔ v ⊔ r)
+    Inserted V l u n = ∃[ inc? ] Tree V l u (if inc? then suc n else n)
+    pattern 0+ tr = false , tr
+    pattern 1+ tr = true  , tr
 \end{code}
 \subsection{Right Rotation}
 When the left subtree becomes too heavy, we rotate the tree to the
@@ -502,11 +505,10 @@ here, we package it in thee forms.
     lookup : (k : Key) → ∀ {v} {V : Set v} → Map V → Maybe V
     lookup k (tree tr) = Bounded.lookup k tr
 
-    -- delete : (k : Key) → ∀ {v} {V : Set v} → Map V → Map V
-    -- delete k (tree {zero} tr) = tree tr
-    -- delete k (tree {suc h} tr) with (Bounded.delete k tr)
-    -- ... | Bounded.0+ tr′ = tree tr′
-    -- ... | Bounded.1+ tr′ = tree tr′
+    delete : (k : Key) → ∀ {v} {V : Set v} → Map V → Map V
+    delete k (tree tr) with Bounded.delete k tr
+    ... | tr′ Bounded.−0 = tree tr′
+    ... | tr′ Bounded.−1 = tree tr′
 \end{code}
 \subsection{Set}
 Note that we can't call the type itself ``Set'', as that's a reserved
@@ -525,11 +527,10 @@ word in Agda.
     member : Key → ⟨Set⟩ → Bool
     member k (tree tr) = is-just (Bounded.lookup k tr)
 
-    -- delete : (k : Key) → ⟨Set⟩ → ⟨Set⟩
-    -- delete k (tree {zero} tr) = tree tr
-    -- delete k (tree {suc h} tr) with (Bounded.delete k tr)
-    -- ... | Bounded.0+ tr′ = tree tr′
-    -- ... | Bounded.1+ tr′ = tree tr′
+    delete : (k : Key) → ⟨Set⟩ → ⟨Set⟩
+    delete k (tree tr) with Bounded.delete k tr
+    ... | tr′ Bounded.−0 = tree tr′
+    ... | tr′ Bounded.−1 = tree tr′
 \end{code}
 \bibliographystyle{IEEEtranS}
 \bibliography{../AVL.bib}
