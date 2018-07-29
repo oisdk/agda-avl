@@ -159,8 +159,8 @@ whose height may have changed:
 \begin{code}
     Inserted : ∀ {v} (V : Key → Set v) (l u : ⌶) (n : ℕ) → Set (k ⊔ v ⊔ r)
     Inserted V l u n = ∃[ inc? ] Tree V l u (if inc? then suc n else n)
-    pattern 0+ tr = false , tr
-    pattern 1+ tr = true  , tr
+    pattern 0+ tr = false  , tr
+    pattern 1+ tr = true   , tr
 \end{code}
 \subsection{Right Rotation}
 When the left subtree becomes too heavy, we rotate the tree to the
@@ -342,7 +342,9 @@ element from the tree, and the rest of the tree:
       _−0 : ∀ {n} → Tree V lb ub n → Deleted V lb ub n
       _−1 : ∀ {n} → Tree V lb ub n → Deleted V lb ub (suc n)
 
-    deleted : ∀ {v} {V : Key → Set v} {lb ub n} → Inserted V lb ub n → Deleted V lb ub (suc n)
+    deleted  : ∀ {v} {V : Key → Set v} {lb ub n}
+             → Inserted V lb ub n
+             → Deleted V lb ub (suc n)
     deleted (0+ x) = x −1
     deleted (1+ x) = x −0
 
@@ -434,28 +436,28 @@ correct complexity bounds.
            → Tree V lb ub h
            → Deleted V lb ub h
     delete _ (leaf l<u) = leaf l<u −0
-    delete k (node k₁ v bl tl tr) with compare k k₁
-    delete k (node k₁ v bl tl tr) | tri< _ _ _ with delete k tl | bl
-    ... | tl′ −1 | ◿  = (node k₁ v ▽ tl′ tr) −1
-    ... | tl′ −1 | ▽  = (node k₁ v ◺ tl′ tr) −0
+    delete k (node k₁ v b tl tr) with compare k k₁
+    delete k (node k₁ v b tl tr) | tri< _ _ _ with delete k tl | b
+    ... | tl′ −1 | ◿  = node k₁ v ▽ tl′ tr −1
+    ... | tl′ −1 | ▽  = node k₁ v ◺ tl′ tr −0
     ... | tl′ −1 | ◺  = deleted (rotˡ k₁ v tl′ tr)
-    ... | tl′ −0 | _  = (node k₁ v bl tl′ tr) −0
-    delete {lb} k (node k v bl tl (leaf k<ub)) | tri≈ _ refl _ with bl | tl
-    ... | ◿  | _ = (widen k<ub tl) −1
-    ... | ▽  | leaf lb<k = (leaf (⌶<-trans lb lb<k k<ub)) −1
-    delete k (node k v bl tl (node kᵣ vᵣ blᵣ tlᵣ trᵣ)) | tri≈ _ refl _
-      with bl | uncons kᵣ vᵣ blᵣ tlᵣ trᵣ
+    ... | tl′ −0 | _  = node k₁ v b tl′ tr −0
+    delete {lb} k (node k v b tl (leaf k<ub)) | tri≈ _ refl _ with b | tl
+    ... | ◿  | _ = widen k<ub tl −1
+    ... | ▽  | leaf lb<k = leaf (⌶<-trans lb lb<k k<ub) −1
+    delete k (node k v b tl (node kᵣ vᵣ bᵣ tlᵣ trᵣ)) | tri≈ _ refl _
+      with b | uncons kᵣ vᵣ bᵣ tlᵣ trᵣ
     ... | ◿  | cons k′ v′ l<u (tr′ −1) = deleted (rotʳ k′ v′ (widen l<u tl) tr′)
-    ... | ◿  | cons k′ v′ l<u (tr′ −0) = (node k′ v′ ◿  (widen l<u tl) tr′) −0
-    ... | ▽  | cons k′ v′ l<u (tr′ −1) = (node k′ v′ ◿  (widen l<u tl) tr′) −0
-    ... | ▽  | cons k′ v′ l<u (tr′ −0) = (node k′ v′ ▽  (widen l<u tl) tr′) −0
-    ... | ◺  | cons k′ v′ l<u (tr′ −1) = (node k′ v′ ▽  (widen l<u tl) tr′) −1
-    ... | ◺  | cons k′ v′ l<u (tr′ −0) = (node k′ v′ ◺  (widen l<u tl) tr′) −0
-    delete k (node k₁ v bl tl tr) | tri> _ _ _ with delete k tr | bl
+    ... | ◿  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ◿  (widen l<u tl) tr′ −0
+    ... | ▽  | cons k′ v′ l<u (tr′ −1) = node k′ v′ ◿  (widen l<u tl) tr′ −0
+    ... | ▽  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ▽  (widen l<u tl) tr′ −0
+    ... | ◺  | cons k′ v′ l<u (tr′ −1) = node k′ v′ ▽  (widen l<u tl) tr′ −1
+    ... | ◺  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ◺  (widen l<u tl) tr′ −0
+    delete k (node k₁ v b tl tr) | tri> _ _ _ with delete k tr | b
     ... | tr′ −1  | ◿  = deleted (rotʳ k₁ v tl tr′)
-    ... | tr′ −1  | ▽  = (node k₁ v ◿ tl tr′) −0
-    ... | tr′ −1  | ◺  = (node k₁ v ▽ tl tr′) −1
-    ... | tr′ −0  | _  = (node k₁ v bl tl tr′) −0
+    ... | tr′ −1  | ▽  = node k₁ v ◿  tl tr′ −0
+    ... | tr′ −1  | ◺  = node k₁ v ▽  tl tr′ −1
+    ... | tr′ −0  | _  = node k₁ v b  tl tr′ −0
 \end{code}
 \section{Packaging}
 Users don't need to be exposed to the indices on the full tree type:
@@ -472,9 +474,7 @@ here, we package it in thee forms.
                 → Map V
                 → Map V
     insertWith k v f (tree tr) =
-       case Bounded.insert k v f tr (lift tt , lift tt) of
-         λ { (Bounded.1+ tr) → tree tr
-           ; (Bounded.0+ tr) → tree tr }
+       tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
 
     insert : ∀ {v} {V : Key → Set v} (k : Key) → V k → Map V → Map V
     insert k v = insertWith k v const
@@ -495,9 +495,7 @@ here, we package it in thee forms.
 
     insertWith : ∀ {v} {V : Set v} (k : Key) → V → (V → V → V) → Map V → Map V
     insertWith k v f (tree tr) =
-      case Bounded.insert k v f tr (lift tt , lift tt) of
-        λ { (Bounded.0+ tr) → tree tr
-          ; (Bounded.1+ tr) → tree tr}
+      tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
 
     insert : ∀ {v} {V : Set v} (k : Key) → V → Map V → Map V
     insert k v = insertWith k v const
@@ -520,9 +518,7 @@ word in Agda.
 
     insert : Key → ⟨Set⟩ → ⟨Set⟩
     insert k (tree tr) =
-      case Bounded.insert k tt const tr (lift tt , lift tt) of
-        λ { (Bounded.0+ tr) → tree tr
-          ; (Bounded.1+ tr) → tree tr}
+      tree (proj₂ (Bounded.insert k tt const tr (lift tt , lift tt)))
 
     member : Key → ⟨Set⟩ → Bool
     member k (tree tr) = is-just (Bounded.lookup k tr)
