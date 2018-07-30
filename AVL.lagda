@@ -130,7 +130,7 @@ We will also need some combinators for balance:
     ⃕  ▽   = ▽
     ⃕  ◺   = ◿
 
-    ⃔ : ∀ {x y z} →  ⟨ x ⊔ y ⟩≡ z → ⟨ y ⊔ z ⟩≡ z
+    ⃔ : ∀ {x y z} → ⟨ x ⊔ y ⟩≡ z → ⟨ y ⊔ z ⟩≡ z
     ⃔  ◿   = ◺
     ⃔  ▽   = ▽
     ⃔  ◺   = ▽
@@ -142,7 +142,10 @@ defined earlier, we ensure that the children of a node cannot differ
 in height by more than 1. The bounds proofs also ensure that the tree
 must be ordered correctly.
 \begin{code}
-    data Tree {v} (V : Key → Set v) (l u : [∙]) : ℕ → Set (k ⊔ v ⊔ r) where
+    data Tree  {v}
+               (V : Key → Set v)
+               (l u : [∙]) : ℕ →
+               Set (k ⊔ v ⊔ r) where
       leaf  : (l<u : l [<] u) → Tree V l u 0
       node  : ∀  {h lh rh}
                  (k : Key)
@@ -160,7 +163,8 @@ performed as correction.
 Before we implement the rotations, we need a type to describe a tree
 whose height may have changed:
 \begin{code}
-    Inserted : ∀ {v} (V : Key → Set v) (l u : [∙]) (n : ℕ) → Set (k ⊔ v ⊔ r)
+    Inserted  : ∀ {v} (V : Key → Set v) (l u : [∙]) (n : ℕ)
+              → Set (k ⊔ v ⊔ r)
     Inserted V l u n = ∃[ inc? ] Tree V l u (if inc? then suc n else n)
     pattern 0+ tr = false  , tr
     pattern 1+ tr = true   , tr
@@ -203,8 +207,10 @@ rotation can be seen in figure~\ref{rightsingle}.
   \label{rightsingle}
 \end{figure}
 \begin{code}
-    rotʳ x xv (node y yv ◿  a b) c = 0+  (node y yv ▽  a (node x xv ▽  b c))
-    rotʳ x xv (node y yv ▽  a b) c = 1+  (node y yv ◺  a (node x xv ◿  b c))
+    rotʳ x xv (node y yv ◿ a b) c =
+      0+ (node y yv ▽ a (node x xv ▽  b c))
+    rotʳ x xv (node y yv ▽ a b) c =
+      1+ (node y yv ◺ a (node x xv ◿  b c))
 \end{code}
 And double rotation in figure~\ref{rightdouble}.
 \begin{figure}[h]
@@ -275,8 +281,10 @@ Left-rotation is essentially the inverse of right.
 \end{figure}
 Single (seen in figure~\ref{leftsingle}).
 \begin{code}
-    rotˡ x xv c (node y yv  ◺  b a) = 0+  (node y yv  ▽  (node x xv  ▽  c b) a)
-    rotˡ x xv c (node y yv  ▽  b a) = 1+  (node y yv  ◿  (node x xv  ◺  c b) a)
+    rotˡ x xv c (node y yv ◺ b a) =
+      0+ (node y yv ▽ (node x xv ▽ c b) a)
+    rotˡ x xv c (node y yv ▽ b a) =
+      1+ (node y yv ◿ (node x xv ◺ c b) a)
 \end{code}
 \begin{figure}[h!]
   \centering
@@ -365,7 +373,10 @@ First then, we need to define ``uncons''. We'll use a custom type as
 the return type from our uncons function, which stores the minimum
 element from the tree, and the rest of the tree:
 \begin{code}
-    data Deleted {v} (V : Key → Set v) (lb ub : [∙]) : ℕ → Set (k ⊔ v ⊔ r) where
+    data Deleted  {v}
+                  (V : Key → Set v)
+                  (lb ub : [∙]) : ℕ →
+                  Set (k ⊔ v ⊔ r) where
       _−0 : ∀ {n} → Tree V lb ub n → Deleted V lb ub n
       _−1 : ∀ {n} → Tree V lb ub n → Deleted V lb ub (suc n)
 
@@ -406,7 +417,9 @@ The uncons function itself is written in a continuation-passing style.
           → ⟨ lh ⊔ rh ⟩≡ h
           → Tree V lb [ k ] lh
           → Tree V [ k ] ub rh
-          → (∀ {lb′} → Deleted V [ lb′ ] ub (suc h) → Deleted V [ lb′ ] ub′ (suc h′))
+          → (∀  {lb′} →
+                Deleted V [ lb′ ] ub   (suc h) →
+                Deleted V [ lb′ ] ub′  (suc h′))
           → Cons V lb ub′ (suc h′)
       go k v ▽ (leaf l<u) tr c = cons k v l<u (c (tr −1))
       go k v ▽ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
@@ -422,10 +435,10 @@ The uncons function itself is written in a continuation-passing style.
 \end{code}
 \subsection{Widening}
 To join the two subtrees together after a deletion operation, we need
-to weaken (or widen) the bounds of the left tree. This is an
+to weaken (or ext) the bounds of the left tree. This is an
 $\mathcal{O}(\log n)$ operation.
 
-For the widening, we'll need some properties on orderings:
+For the exting, we'll need some properties on orderings:
 \begin{code}
     x≮⌊⌋ : ∀ {x} → x [<] ⌊⌋ → Lift r ⊥
     x≮⌊⌋ {⌊⌋}      = lift ∘ lower
@@ -444,15 +457,15 @@ For the widening, we'll need some properties on orderings:
     [<]-trans [ x ]  {[ y ]}  {[ z ]}  x<y  y<z  =
       IsStrictTotalOrder.trans isStrictTotalOrder x<y y<z
 \end{code}
-Finally, the widen function itself simply walks down the right branch
+Finally, the ext function itself simply walks down the right branch
 of the tree until it hits a leaf.
 \begin{code}
-    widen : ∀ {lb ub ub′ h v} {V : Key → Set v}
+    ext : ∀ {lb ub ub′ h v} {V : Key → Set v}
          → ub [<] ub′
          → Tree V lb ub h
          → Tree V lb ub′ h
-    widen {lb} ub<ub′ (leaf l<u) = leaf ([<]-trans lb l<u ub<ub′)
-    widen ub<ub′ (node k v bl tl tr) = node k v bl tl (widen ub<ub′ tr)
+    ext {lb} ub<ub′ (leaf l<u) = leaf ([<]-trans lb l<u ub<ub′)
+    ext ub<ub′ (node k v bl tl tr) = node k v bl tl (ext ub<ub′ tr)
 \end{code}
 \subsection{Full Deletion}
 The deletion function is by no means simple, but it does maintain the
@@ -470,16 +483,16 @@ correct complexity bounds.
     ... | tl′ −1 | ◺  = deleted (rotˡ k₁ v tl′ tr)
     ... | tl′ −0 | _  = node k₁ v b tl′ tr −0
     delete {lb} k (node k v b tl (leaf k<ub)) | tri≈ _ refl _ with b | tl
-    ... | ◿  | _ = widen k<ub tl −1
+    ... | ◿  | _ = ext k<ub tl −1
     ... | ▽  | leaf lb<k = leaf ([<]-trans lb lb<k k<ub) −1
     delete k (node k v b tl (node kᵣ vᵣ bᵣ tlᵣ trᵣ)) | tri≈ _ refl _
       with b | uncons kᵣ vᵣ bᵣ tlᵣ trᵣ
-    ... | ◿  | cons k′ v′ l<u (tr′ −1) = deleted (rotʳ k′ v′ (widen l<u tl) tr′)
-    ... | ◿  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ◿  (widen l<u tl) tr′ −0
-    ... | ▽  | cons k′ v′ l<u (tr′ −1) = node k′ v′ ◿  (widen l<u tl) tr′ −0
-    ... | ▽  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ▽  (widen l<u tl) tr′ −0
-    ... | ◺  | cons k′ v′ l<u (tr′ −1) = node k′ v′ ▽  (widen l<u tl) tr′ −1
-    ... | ◺  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ◺  (widen l<u tl) tr′ −0
+    ... | ◿  | cons k′ v′ l<u (tr′ −1) = deleted (rotʳ k′ v′ (ext l<u tl) tr′)
+    ... | ◿  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ◿  (ext l<u tl) tr′ −0
+    ... | ▽  | cons k′ v′ l<u (tr′ −1) = node k′ v′ ◿  (ext l<u tl) tr′ −0
+    ... | ▽  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ▽  (ext l<u tl) tr′ −0
+    ... | ◺  | cons k′ v′ l<u (tr′ −1) = node k′ v′ ▽  (ext l<u tl) tr′ −1
+    ... | ◺  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ◺  (ext l<u tl) tr′ −0
     delete k (node k₁ v b tl tr) | tri> _ _ _ with delete k tr | b
     ... | tr′ −1  | ◿  = deleted (rotʳ k₁ v tl tr′)
     ... | tr′ −1  | ▽  = node k₁ v ◿  tl tr′ −0
@@ -493,7 +506,9 @@ here, we package it in thee forms.
 \begin{code}
   module DependantMap where
     data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
-      tree : ∀ {h} → Bounded.Tree V Bounded.⌊⌋ Bounded.⌈⌉ h → Map V
+      tree  : ∀ {h}
+            → Bounded.Tree V Bounded.⌊⌋ Bounded.⌈⌉ h
+            → Map V
 
     insertWith  : ∀ {v} {V : Key → Set v} (k : Key)
                 → V k
@@ -503,13 +518,24 @@ here, we package it in thee forms.
     insertWith k v f (tree tr) =
        tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
 
-    insert : ∀ {v} {V : Key → Set v} (k : Key) → V k → Map V → Map V
+    insert : ∀  {v}
+                {V : Key → Set v}
+                (k : Key) →
+                V k →
+                Map V →
+                Map V
     insert k v = insertWith k v const
 
-    lookup : (k : Key) → ∀ {v} {V : Key → Set v} → Map V → Maybe (V k)
+    lookup  : (k : Key)
+            → ∀ {v} {V : Key → Set v}
+            → Map V
+            → Maybe (V k)
     lookup k (tree tr) = Bounded.lookup k tr
 
-    delete : (k : Key) → ∀ {v} {V : Key → Set v} → Map V → Map V
+    delete  : (k : Key)
+            → ∀ {v} {V : Key → Set v}
+            → Map V
+            → Map V
     delete k (tree tr) with Bounded.delete k tr
     ... | tr′ Bounded.−0 = tree tr′
     ... | tr′ Bounded.−1 = tree tr′
@@ -518,9 +544,15 @@ here, we package it in thee forms.
 \begin{code}
   module Map where
     data Map {v} (V : Set v) : Set (k ⊔ v ⊔ r) where
-      tree : ∀ {h} → Bounded.Tree (const V) Bounded.⌊⌋ Bounded.⌈⌉ h → Map V
+      tree  : ∀ {h}
+            → Bounded.Tree (const V) Bounded.⌊⌋ Bounded.⌈⌉ h
+            → Map V
 
-    insertWith : ∀ {v} {V : Set v} (k : Key) → V → (V → V → V) → Map V → Map V
+    insertWith  : ∀ {v} {V : Set v} (k : Key)
+                → V
+                → (V → V → V)
+                → Map V
+                → Map V
     insertWith k v f (tree tr) =
       tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
 
@@ -541,7 +573,9 @@ word in Agda.
 \begin{code}
   module Sets where
     data ⟨Set⟩ : Set (k ⊔ r) where
-      tree : ∀ {h} → Bounded.Tree (const ⊤) Bounded.⌊⌋ Bounded.⌈⌉ h → ⟨Set⟩
+      tree  : ∀ {h}
+            → Bounded.Tree (const ⊤) Bounded.⌊⌋ Bounded.⌈⌉ h
+            → ⟨Set⟩
 
     insert : Key → ⟨Set⟩ → ⟨Set⟩
     insert k (tree tr) =

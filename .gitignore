@@ -11,3 +11,8 @@
 *.blg
 *.xml
 *.toc
+*.md5
+*.auxlock
+*.for
+*.tmp
+*.copy
