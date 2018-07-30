@@ -15,7 +15,7 @@
 \DeclareUnicodeCharacter{9727}{\ensuremath{\mathbin{\rotatebox[origin=c]{225}{$\dotminus$}}}}
 \DeclareUnicodeCharacter{9722}{\ensuremath{\mathbin{\rotatebox[origin=c]{135}{$\dotminus$}}}}
 \DeclareUnicodeCharacter{9041}{\ensuremath{1}}
-\DeclareUnicodeCharacter{9014}{\ensuremath{{}^{⊤}_{⊥}}}
+\DeclareUnicodeCharacter{9014}{\ensuremath{{}^{⌈⌉}_{⌊⌋}}}
 \DeclareUnicodeCharacter{737}{\ensuremath{^{l}}}
 \DeclareUnicodeCharacter{691}{\ensuremath{^{r}}}
 \DeclareUnicodeCharacter{8405}{\ensuremath{\minusrdots}}
@@ -47,11 +47,11 @@ open import Relation.Binary.PropositionalEquality
 open import Level using (Lift; lift; _⊔_; lower)
 open import Data.Nat as ℕ using (ℕ; suc; zero; pred)
 open import Data.Product
-open import Data.Unit renaming (⊤ to ⍑)
+open import Data.Unit
 open import Data.Maybe
 open import Function
 open import Data.Bool
-open import Data.Empty renaming (⊥ to ⍊)
+open import Data.Empty
 \end{code}
 
 Next, we declare a module: the entirety of the following code is
@@ -80,31 +80,31 @@ upper bounds to our key type.
 
     infix 5 [_]
 
-    data ⌶ : Set k where
-      ⊥ ⊤ : ⌶
-      [_] : (k : Key) → ⌶
+    data [∙] : Set k where
+      ⌊⌋ ⌈⌉  : [∙]
+      [_]    : (k : Key) → [∙]
 \end{code}
 
 This type itself admits an ordering relation.
 \begin{code}
-    infix 4 _⌶<_
+    infix 4 _[<]_
 
-    _⌶<_ : ⌶ → ⌶ → Set r
-    ⊥      ⌶< ⊥      = Lift r ⍊
-    ⊥      ⌶< ⊤      = Lift r ⍑
-    ⊥      ⌶< [ _ ]  = Lift r ⍑
-    ⊤      ⌶< _      = Lift r ⍊
-    [ _ ]  ⌶< ⊥      = Lift r ⍊
-    [ _ ]  ⌶< ⊤      = Lift r ⍑
-    [ x ]  ⌶< [ y ]  = x < y
+    _[<]_ : [∙] → [∙] → Set r
+    ⌊⌋     [<] ⌊⌋     = Lift r ⊥
+    ⌊⌋     [<] ⌈⌉     = Lift r ⊤
+    ⌊⌋     [<] [ _ ]  = Lift r ⊤
+    ⌈⌉     [<] _      = Lift r ⊥
+    [ _ ]  [<] ⌊⌋     = Lift r ⊥
+    [ _ ]  [<] ⌈⌉     = Lift r ⊤
+    [ x ]  [<] [ y ]  = x < y
 \end{code}
 
 Finally, we can describe a value as being ``in bounds'' like so.
 \begin{code}
     infix 4 _<_<_
 
-    _<_<_ : ⌶ → Key → ⌶ → Set r
-    l < x < u = l ⌶< [ x ] × [ x ] ⌶< u
+    _<_<_ : [∙] → Key → [∙] → Set r
+    l < x < u = l [<] [ x ] × [ x ] [<] u
 \end{code}
 \section{Balance}
 To describe the balance of the tree, we use the following type:
@@ -142,8 +142,8 @@ defined earlier, we ensure that the children of a node cannot differ
 in height by more than 1. The bounds proofs also ensure that the tree
 must be ordered correctly.
 \begin{code}
-    data Tree {v} (V : Key → Set v) (l u : ⌶) : ℕ → Set (k ⊔ v ⊔ r) where
-      leaf  : (l<u : l ⌶< u) → Tree V l u 0
+    data Tree {v} (V : Key → Set v) (l u : [∙]) : ℕ → Set (k ⊔ v ⊔ r) where
+      leaf  : (l<u : l [<] u) → Tree V l u 0
       node  : ∀  {h lh rh}
                  (k : Key)
                  (v : V k)
@@ -160,7 +160,7 @@ performed as correction.
 Before we implement the rotations, we need a type to describe a tree
 whose height may have changed:
 \begin{code}
-    Inserted : ∀ {v} (V : Key → Set v) (l u : ⌶) (n : ℕ) → Set (k ⊔ v ⊔ r)
+    Inserted : ∀ {v} (V : Key → Set v) (l u : [∙]) (n : ℕ) → Set (k ⊔ v ⊔ r)
     Inserted V l u n = ∃[ inc? ] Tree V l u (if inc? then suc n else n)
     pattern 0+ tr = false  , tr
     pattern 1+ tr = true   , tr
@@ -365,7 +365,7 @@ First then, we need to define ``uncons''. We'll use a custom type as
 the return type from our uncons function, which stores the minimum
 element from the tree, and the rest of the tree:
 \begin{code}
-    data Deleted {v} (V : Key → Set v) (lb ub : ⌶) : ℕ → Set (k ⊔ v ⊔ r) where
+    data Deleted {v} (V : Key → Set v) (lb ub : [∙]) : ℕ → Set (k ⊔ v ⊔ r) where
       _−0 : ∀ {n} → Tree V lb ub n → Deleted V lb ub n
       _−1 : ∀ {n} → Tree V lb ub n → Deleted V lb ub (suc n)
 
@@ -377,13 +377,13 @@ element from the tree, and the rest of the tree:
 
     record Cons {v}
                 (V : Key → Set v)
-                (lb ub : ⌶)
+                (lb ub : [∙])
                 (h : ℕ) : Set (k ⊔ v ⊔ r) where
       constructor cons
       field
         head  : Key
         val   : V head
-        l<u   : lb ⌶< [ head ]
+        l<u   : lb [<] [ head ]
         tail  : Deleted V [ head ] ub h
 \end{code}
 You'll notice it also stores a proof that the extracted element
@@ -427,31 +427,31 @@ $\mathcal{O}(\log n)$ operation.
 
 For the widening, we'll need some properties on orderings:
 \begin{code}
-    x≮⊥ : ∀ {x} → x ⌶< ⊥ → Lift r ⍊
-    x≮⊥ {⊥}      = lift ∘ lower
-    x≮⊥ {⊤}      = lift ∘ lower
-    x≮⊥ {[ _ ]}  = lift ∘ lower
+    x≮⌊⌋ : ∀ {x} → x [<] ⌊⌋ → Lift r ⊥
+    x≮⌊⌋ {⌊⌋}      = lift ∘ lower
+    x≮⌊⌋ {⌈⌉}      = lift ∘ lower
+    x≮⌊⌋ {[ _ ]}  = lift ∘ lower
 
-    ⌶<-trans : ∀ x {y z} → x ⌶< y → y ⌶< z → x ⌶< z
-    ⌶<-trans ⊥      {y}      {⊥}      _    y<z  = x≮⊥ {x = y} y<z
-    ⌶<-trans ⊥      {_}      {⊤}      _    _    = _
-    ⌶<-trans ⊥      {_}      {[ _ ]}  _    _    = _
-    ⌶<-trans ⊤      {_}      {_}      (lift ()) _
-    ⌶<-trans [ _ ]  {y}      {⊥}      _    y<z  = x≮⊥ {x = y} y<z
-    ⌶<-trans [ _ ]  {_}      {⊤}      _    _    = _
-    ⌶<-trans [ _ ]  {⊥}      {[ _ ]}  (lift ()) _
-    ⌶<-trans [ _ ]  {⊤}      {[ _ ]}  _ (lift ())
-    ⌶<-trans [ x ]  {[ y ]}  {[ z ]}  x<y  y<z  =
+    [<]-trans : ∀ x {y z} → x [<] y → y [<] z → x [<] z
+    [<]-trans ⌊⌋      {y}      {⌊⌋}      _    y<z  = x≮⌊⌋ {x = y} y<z
+    [<]-trans ⌊⌋      {_}      {⌈⌉}      _    _    = _
+    [<]-trans ⌊⌋      {_}      {[ _ ]}  _    _    = _
+    [<]-trans ⌈⌉      {_}      {_}      (lift ()) _
+    [<]-trans [ _ ]  {y}      {⌊⌋}      _    y<z  = x≮⌊⌋ {x = y} y<z
+    [<]-trans [ _ ]  {_}      {⌈⌉}      _    _    = _
+    [<]-trans [ _ ]  {⌊⌋}      {[ _ ]}  (lift ()) _
+    [<]-trans [ _ ]  {⌈⌉}      {[ _ ]}  _ (lift ())
+    [<]-trans [ x ]  {[ y ]}  {[ z ]}  x<y  y<z  =
       IsStrictTotalOrder.trans isStrictTotalOrder x<y y<z
 \end{code}
 Finally, the widen function itself simply walks down the right branch
 of the tree until it hits a leaf.
 \begin{code}
     widen : ∀ {lb ub ub′ h v} {V : Key → Set v}
-         → ub ⌶< ub′
+         → ub [<] ub′
          → Tree V lb ub h
          → Tree V lb ub′ h
-    widen {lb} ub<ub′ (leaf l<u) = leaf (⌶<-trans lb l<u ub<ub′)
+    widen {lb} ub<ub′ (leaf l<u) = leaf ([<]-trans lb l<u ub<ub′)
     widen ub<ub′ (node k v bl tl tr) = node k v bl tl (widen ub<ub′ tr)
 \end{code}
 \subsection{Full Deletion}
@@ -471,7 +471,7 @@ correct complexity bounds.
     ... | tl′ −0 | _  = node k₁ v b tl′ tr −0
     delete {lb} k (node k v b tl (leaf k<ub)) | tri≈ _ refl _ with b | tl
     ... | ◿  | _ = widen k<ub tl −1
-    ... | ▽  | leaf lb<k = leaf (⌶<-trans lb lb<k k<ub) −1
+    ... | ▽  | leaf lb<k = leaf ([<]-trans lb lb<k k<ub) −1
     delete k (node k v b tl (node kᵣ vᵣ bᵣ tlᵣ trᵣ)) | tri≈ _ refl _
       with b | uncons kᵣ vᵣ bᵣ tlᵣ trᵣ
     ... | ◿  | cons k′ v′ l<u (tr′ −1) = deleted (rotʳ k′ v′ (widen l<u tl) tr′)
@@ -493,7 +493,7 @@ here, we package it in thee forms.
 \begin{code}
   module DependantMap where
     data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
-      tree : ∀ {h} → Bounded.Tree V Bounded.⊥ Bounded.⊤ h → Map V
+      tree : ∀ {h} → Bounded.Tree V Bounded.⌊⌋ Bounded.⌈⌉ h → Map V
 
     insertWith  : ∀ {v} {V : Key → Set v} (k : Key)
                 → V k
@@ -518,7 +518,7 @@ here, we package it in thee forms.
 \begin{code}
   module Map where
     data Map {v} (V : Set v) : Set (k ⊔ v ⊔ r) where
-      tree : ∀ {h} → Bounded.Tree (const V) Bounded.⊥ Bounded.⊤ h → Map V
+      tree : ∀ {h} → Bounded.Tree (const V) Bounded.⌊⌋ Bounded.⌈⌉ h → Map V
 
     insertWith : ∀ {v} {V : Set v} (k : Key) → V → (V → V → V) → Map V → Map V
     insertWith k v f (tree tr) =
@@ -541,7 +541,7 @@ word in Agda.
 \begin{code}
   module Sets where
     data ⟨Set⟩ : Set (k ⊔ r) where
-      tree : ∀ {h} → Bounded.Tree (const ⍑) Bounded.⊥ Bounded.⊤ h → ⟨Set⟩
+      tree : ∀ {h} → Bounded.Tree (const ⊤) Bounded.⌊⌋ Bounded.⌈⌉ h → ⟨Set⟩
 
     insert : Key → ⟨Set⟩ → ⟨Set⟩
     insert k (tree tr) =
