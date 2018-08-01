@@ -512,13 +512,12 @@ correct complexity bounds.
 \end{code}
 \section{Alteration}
 \begin{code}
-
---     alter : ∀ {lb ub h v} {V : Key → Set v}
---           → (k : Key)
---           → (Maybe (V k) → Maybe (V k))
---           → Tree V lb ub h
---           → lb < k < ub
---           → Altered V lb ub h
+    -- alter : ∀ {lb ub h v} {V : Key → Set v}
+    --       → (k : Key)
+    --       → (Maybe (V k) → Maybe (V k))
+    --       → Tree V lb ub h
+    --       → lb < k < ub
+    --       → Altered V lb ub h
 --     alter x f (leaf l<u) (l , u) with f nothing
 --     alter x f (leaf l<u) (l , u) | just yv = ↑ (node x yv ▽ (leaf l) (leaf u))
 --     alter x f (leaf l<u) (l , u) | nothing = ⟨ leaf l<u ⟩
@@ -547,100 +546,97 @@ correct complexity bounds.
 --     alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↓ tr′ | ▽ = ⟨ node y yv ◿  tl tr′ ⟩
 --     alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↓ tr′ | ◺ = ↓ (node y yv ▽  tl tr′)
 
--- \end{code}
--- \section{Packaging}
--- Users don't need to be exposed to the indices on the full tree type:
--- here, we package it in thee forms.
--- \subsection{Dependent Map}
--- \begin{code}
---   module DependantMap where
---     data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
---       tree  : ∀ {h}
---             → Bounded.Tree V Bounded.⌊⌋ Bounded.⌈⌉ h
---             → Map V
+\end{code}
+\section{Packaging}
+Users don't need to be exposed to the indices on the full tree type:
+here, we package it in thee forms.
+\subsection{Dependent Map}
+\begin{code}
+  module DependantMap where
+    data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
+      tree  : ∀ {h}
+            → Bounded.Tree V Bounded.⌊⌋ Bounded.⌈⌉ h
+            → Map V
 
---     insertWith  : ∀ {v} {V : Key → Set v} (k : Key)
---                 → V k
---                 → (V k → V k → V k)
---                 → Map V
---                 → Map V
---     insertWith k v f (tree tr) with Bounded.insert k v f tr (lift tt , lift tt)
---     insertWith k v f (tree tr) | Bounded.modified _ _ tr′ = tree tr′
+    insertWith  : ∀ {v} {V : Key → Set v} (k : Key)
+                → V k
+                → (V k → V k → V k)
+                → Map V
+                → Map V
+    insertWith k v f (tree tr) = tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
 
---     insert : ∀  {v}
---                 {V : Key → Set v}
---                 (k : Key) →
---                 V k →
---                 Map V →
---                 Map V
---     insert k v = insertWith k v const
+    insert : ∀  {v}
+                {V : Key → Set v}
+                (k : Key) →
+                V k →
+                Map V →
+                Map V
+    insert k v = insertWith k v const
 
---     lookup  : (k : Key)
---             → ∀ {v} {V : Key → Set v}
---             → Map V
---             → Maybe (V k)
---     lookup k (tree tr) = Bounded.lookup k tr
+    lookup  : (k : Key)
+            → ∀ {v} {V : Key → Set v}
+            → Map V
+            → Maybe (V k)
+    lookup k (tree tr) = Bounded.lookup k tr
 
---     delete  : (k : Key)
---             → ∀ {v} {V : Key → Set v}
---             → Map V
---             → Map V
---     delete k (tree tr) with Bounded.delete k tr
---     ... | tr′ Bounded.−0 = tree tr′
---     ... | tr′ Bounded.−1 = tree tr′
--- \end{code}
--- \subsection{Non-Dependent (Simple) Map}
--- \begin{code}
---   module Map where
---     data Map {v} (V : Set v) : Set (k ⊔ v ⊔ r) where
---       tree  : ∀ {h}
---             → Bounded.Tree (const V) Bounded.⌊⌋ Bounded.⌈⌉ h
---             → Map V
+    delete  : (k : Key)
+            → ∀ {v} {V : Key → Set v}
+            → Map V
+            → Map V
+    delete k (tree tr) with Bounded.delete k tr
+    ... | tr′ Bounded.−0 = tree tr′
+    ... | tr′ Bounded.−1 = tree tr′
+\end{code}
+\subsection{Non-Dependent (Simple) Map}
+\begin{code}
+  module Map where
+    data Map {v} (V : Set v) : Set (k ⊔ v ⊔ r) where
+      tree  : ∀ {h}
+            → Bounded.Tree (const V) Bounded.⌊⌋ Bounded.⌈⌉ h
+            → Map V
 
---     insertWith  : ∀ {v} {V : Set v} (k : Key)
---                 → V
---                 → (V → V → V)
---                 → Map V
---                 → Map V
---     insertWith k v f (tree tr) with Bounded.insert k v f tr (lift tt , lift tt)
---     insertWith k v f (tree tr) | Bounded.modified _ _ tr′ = tree tr′
+    insertWith  : ∀ {v} {V : Set v} (k : Key)
+                → V
+                → (V → V → V)
+                → Map V
+                → Map V
+    insertWith k v f (tree tr) = tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
 
---     empty : ∀ {v} {V : Set v} → Map V
---     empty = tree (Bounded.leaf (lift tt))
+    empty : ∀ {v} {V : Set v} → Map V
+    empty = tree (Bounded.leaf (lift tt))
 
---     insert : ∀ {v} {V : Set v} (k : Key) → V → Map V → Map V
---     insert k v = insertWith k v const
+    insert : ∀ {v} {V : Set v} (k : Key) → V → Map V → Map V
+    insert k v = insertWith k v const
 
---     lookup : (k : Key) → ∀ {v} {V : Set v} → Map V → Maybe V
---     lookup k (tree tr) = Bounded.lookup k tr
+    lookup : (k : Key) → ∀ {v} {V : Set v} → Map V → Maybe V
+    lookup k (tree tr) = Bounded.lookup k tr
 
---     delete : (k : Key) → ∀ {v} {V : Set v} → Map V → Map V
---     delete k (tree tr) with Bounded.delete k tr
---     ... | tr′ Bounded.−0 = tree tr′
---     ... | tr′ Bounded.−1 = tree tr′
--- \end{code}
--- \subsection{Set}
--- Note that we can't call the type itself ``Set'', as that's a reserved
--- word in Agda.
--- \begin{code}
---   module Sets where
---     data ⟨Set⟩ : Set (k ⊔ r) where
---       tree  : ∀ {h}
---             → Bounded.Tree (const ⊤) Bounded.⌊⌋ Bounded.⌈⌉ h
---             → ⟨Set⟩
+    delete : (k : Key) → ∀ {v} {V : Set v} → Map V → Map V
+    delete k (tree tr) with Bounded.delete k tr
+    ... | tr′ Bounded.−0 = tree tr′
+    ... | tr′ Bounded.−1 = tree tr′
+\end{code}
+\subsection{Set}
+Note that we can't call the type itself ``Set'', as that's a reserved
+word in Agda.
+\begin{code}
+  module Sets where
+    data ⟨Set⟩ : Set (k ⊔ r) where
+      tree  : ∀ {h}
+            → Bounded.Tree (const ⊤) Bounded.⌊⌋ Bounded.⌈⌉ h
+            → ⟨Set⟩
 
---     insert : Key → ⟨Set⟩ → ⟨Set⟩
---     insert k (tree tr) with Bounded.insert k tt const tr (lift tt , lift tt)
---     insert k (tree tr) | Bounded.modified _ _ tr′ = tree tr′
+    insert : Key → ⟨Set⟩ → ⟨Set⟩
+    insert k (tree tr) = tree (proj₂ (Bounded.insert k tt const tr (lift tt , lift tt)))
 
---     member : Key → ⟨Set⟩ → Bool
---     member k (tree tr) = is-just (Bounded.lookup k tr)
+    member : Key → ⟨Set⟩ → Bool
+    member k (tree tr) = is-just (Bounded.lookup k tr)
 
---     delete : (k : Key) → ⟨Set⟩ → ⟨Set⟩
---     delete k (tree tr) with Bounded.delete k tr
---     ... | tr′ Bounded.−0 = tree tr′
---     ... | tr′ Bounded.−1 = tree tr′
--- \end{code}
--- \bibliographystyle{IEEEtranS}
--- \bibliography{../AVL.bib}
--- \end{document}
+    delete : (k : Key) → ⟨Set⟩ → ⟨Set⟩
+    delete k (tree tr) with Bounded.delete k tr
+    ... | tr′ Bounded.−0 = tree tr′
+    ... | tr′ Bounded.−1 = tree tr′
+\end{code}
+\bibliographystyle{IEEEtranS}
+\bibliography{../AVL.bib}
+\end{document}
