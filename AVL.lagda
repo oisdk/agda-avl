@@ -471,6 +471,19 @@ of the tree until it hits a leaf.
 The deletion function is by no means simple, but it does maintain the
 correct complexity bounds.
 \begin{code}
+    join : ∀ {lb ub lh rh h v k} {V : Key → Set v}
+         → Tree V [ k ] ub rh
+         → ⟨ lh ⊔ rh ⟩≡ h
+         → Tree V lb [ k ] lh
+         → Deleted V lb ub (suc h)
+    join (leaf k<ub) ◿ tl = ext k<ub tl −1
+    join {lb} (leaf k<ub) ▽ (leaf lb<k) = leaf ([<]-trans lb lb<k k<ub) −1
+    join (node kᵣ vᵣ bᵣ tlᵣ trᵣ) b  tl with uncons kᵣ vᵣ bᵣ tlᵣ trᵣ
+    join (node kᵣ vᵣ bᵣ tlᵣ trᵣ) b  tl | cons k′ v′ l<u (tr′ −0)  = node k′ v′ b  (ext l<u tl) tr′ −0
+    join (node kᵣ vᵣ bᵣ tlᵣ trᵣ) ◿  tl | cons k′ v′ l<u (tr′ −1)  = deleted (rotʳ k′ v′ (ext l<u tl) tr′)
+    join (node kᵣ vᵣ bᵣ tlᵣ trᵣ) ▽  tl | cons k′ v′ l<u (tr′ −1)  = node k′ v′ ◿  (ext l<u tl) tr′ −0
+    join (node kᵣ vᵣ bᵣ tlᵣ trᵣ) ◺  tl | cons k′ v′ l<u (tr′ −1)  = node k′ v′ ▽  (ext l<u tl) tr′ −1
+
     delete : ∀ {lb ub h v} {V : Key → Set v}
            → (k : Key)
            → Tree V lb ub h
@@ -482,22 +495,66 @@ correct complexity bounds.
     ... | tl′ −1 | ▽  = node k₁ v ◺ tl′ tr −0
     ... | tl′ −1 | ◺  = deleted (rotˡ k₁ v tl′ tr)
     ... | tl′ −0 | _  = node k₁ v b tl′ tr −0
-    delete {lb} k (node k v b tl (leaf k<ub)) | tri≈ _ refl _ with b | tl
-    ... | ◿  | _ = ext k<ub tl −1
-    ... | ▽  | leaf lb<k = leaf ([<]-trans lb lb<k k<ub) −1
-    delete k (node k v b tl (node kᵣ vᵣ bᵣ tlᵣ trᵣ)) | tri≈ _ refl _
-      with b | uncons kᵣ vᵣ bᵣ tlᵣ trᵣ
-    ... | ◿  | cons k′ v′ l<u (tr′ −1) = deleted (rotʳ k′ v′ (ext l<u tl) tr′)
-    ... | ◿  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ◿  (ext l<u tl) tr′ −0
-    ... | ▽  | cons k′ v′ l<u (tr′ −1) = node k′ v′ ◿  (ext l<u tl) tr′ −0
-    ... | ▽  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ▽  (ext l<u tl) tr′ −0
-    ... | ◺  | cons k′ v′ l<u (tr′ −1) = node k′ v′ ▽  (ext l<u tl) tr′ −1
-    ... | ◺  | cons k′ v′ l<u (tr′ −0) = node k′ v′ ◺  (ext l<u tl) tr′ −0
+    delete .k (node k v b tl tr) | tri≈ _ refl _ = join tr b tl
     delete k (node k₁ v b tl tr) | tri> _ _ _ with delete k tr | b
     ... | tr′ −1  | ◿  = deleted (rotʳ k₁ v tl tr′)
     ... | tr′ −1  | ▽  = node k₁ v ◿  tl tr′ −0
     ... | tr′ −1  | ◺  = node k₁ v ▽  tl tr′ −1
     ... | tr′ −0  | _  = node k₁ v b  tl tr′ −0
+\end{code}
+\section{Alteration}
+\begin{code}
+    data Altered  {v} (V : Key → Set v) (lb ub : [∙]) : ℕ → Set (k ⊔ v ⊔ r) where
+      ↑   : ∀ {n} → Tree V lb ub (suc n) → Altered V lb ub n
+      ⟨_⟩ : ∀ {n} → Tree V lb ub n       → Altered V lb ub n
+      ↓   : ∀ {n} → Tree V lb ub n       → Altered V lb ub (suc n)
+
+    fromDeleted : ∀ {v lb ub h} {V : Key → Set v} → Deleted V lb ub h → Altered V lb ub h
+    fromDeleted (x −0) = ⟨ x ⟩
+    fromDeleted (x −1) = ↓ x
+
+    fromInserted↑ : ∀ {v lb ub h} {V : Key → Set v} → Inserted V lb ub h → Altered V lb ub h
+    fromInserted↑ (0+ x) = ⟨ x ⟩
+    fromInserted↑ (1+ x) = ↑ x
+
+    fromInserted↓ : ∀ {v lb ub h} {V : Key → Set v} → Inserted V lb ub h → Altered V lb ub (suc h)
+    fromInserted↓ (0+ x) = ↓ x
+    fromInserted↓ (1+ x) = ⟨ x ⟩
+
+    alter : ∀ {lb ub h v} {V : Key → Set v}
+          → (k : Key)
+          → (Maybe (V k) → Maybe (V k))
+          → Tree V lb ub h
+          → lb < k < ub
+          → Altered V lb ub h
+    alter x f (leaf l<u) (l , u) with f nothing
+    alter x f (leaf l<u) (l , u) | just yv = ↑ (node x yv ▽ (leaf l) (leaf u))
+    alter x f (leaf l<u) (l , u) | nothing = ⟨ leaf l<u ⟩
+    alter x f (node y yv bl tl tr) (l , u) with compare x y
+    alter x f (node .x xv bl tl tr) (l , u) | tri≈ ¬a refl ¬c with f (just xv)
+    alter x f (node .x xv bl tl tr) (l , u) | tri≈ ¬a refl ¬c | just yv = ⟨ node x yv bl tl tr ⟩
+    alter x f (node .x xv bl tl tr) (l , u) | tri≈ ¬a refl ¬c | nothing = fromDeleted (join tr bl tl)
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c with alter x f tl (l , a)
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ↑ tl′ with bl
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ↑ tl′ | ◿ = fromInserted↑ (rotʳ y yv tl′ tr)
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ↑ tl′ | ▽ = ↑ (node y yv ◿ tl′ tr)
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ↑ tl′ | ◺ = ⟨ node y yv ▽ tl′ tr ⟩
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ⟨ tl′ ⟩ = ⟨ node y yv bl tl′ tr ⟩
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ↓ tl′ with bl
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ↓ tl′ | ◿ = ↓ (node y yv ▽ tl′ tr)
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ↓ tl′ | ▽ = ⟨ node y yv ◺ tl′ tr ⟩
+    alter x f (node y yv bl tl tr) (l , u) | tri< a ¬b ¬c | ↓ tl′ | ◺ = fromInserted↓ (rotˡ y yv tl′ tr)
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c with alter x f tr (c , u)
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↑ tr′ with bl
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↑ tr′ | ◿ = ⟨ node y yv  ▽  tl tr′ ⟩
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↑ tr′ | ▽ = ↑ (node y yv  ◺  tl tr′)
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↑ tr′ | ◺ = fromInserted↑ (rotˡ y yv tl tr′)
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ⟨ tr′ ⟩ = ⟨ node y yv bl tl tr′ ⟩
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↓ tr′ with bl
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↓ tr′ | ◿ = fromInserted↓ (rotʳ y yv tl tr′)
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↓ tr′ | ▽ = ⟨ node y yv ◿  tl tr′ ⟩
+    alter x f (node y yv bl tl tr) (l , u) | tri> ¬a ¬b c | ↓ tr′ | ◺ = ↓ (node y yv ▽  tl tr′)
+
 \end{code}
 \section{Packaging}
 Users don't need to be exposed to the indices on the full tree type:
@@ -555,6 +612,9 @@ here, we package it in thee forms.
                 → Map V
     insertWith k v f (tree tr) =
       tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
+
+    empty : ∀ {v} {V : Set v} → Map V
+    empty = tree (Bounded.leaf (lift tt))
 
     insert : ∀ {v} {V : Set v} (k : Key) → V → Map V → Map V
     insert k v = insertWith k v const
