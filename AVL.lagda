@@ -524,6 +524,12 @@ correct complexity bounds.
     ... | ◺  = node y yv ▽  l r′ −1
 \end{code}
 \section{Alteration}
+This is a combination of insertion and deletion: it lets the user
+supply a function to modify, insert, or remove an element, depending
+on the element already in the tree.
+
+As it can both increase and decrease the size of the tree, we need a
+wrapper to represent that:
 \begin{code}
     data _⟨_⟩±1 {ℓ} (T : ℕ → Set ℓ) : ℕ → Set ℓ where
       1+⟨_⟩  : ∀ {n} → T (suc n)  → T ⟨ n ⟩±1
@@ -541,7 +547,10 @@ correct complexity bounds.
               → T ⟨ n ⟩±1
     1⨤⟨ 0+ x ⟩⇒+1 = ⟨ x ⟩
     1⨤⟨ 1+ x ⟩⇒+1 = 1+⟨ x ⟩
-
+\end{code}
+And then the function itself. It's long, but you should be able to see
+the deletion and insertion components.
+\begin{code}
     alter : ∀ {lb ub h v} {V : Key → Set v}
           → (k : Key)
           → (Maybe (V k) → Maybe (V k))
@@ -616,6 +625,16 @@ here, we package it in thee forms.
     delete k (tree tr) with Bounded.delete k tr
     ... | tr′ Bounded.−0 = tree tr′
     ... | tr′ Bounded.−1 = tree tr′
+
+    alter  : (k : Key)
+           → ∀ {v} {V : Key → Set v}
+           → (Maybe (V k) → Maybe (V k))
+           → Map V
+           → Map V
+    alter k f (tree tr) with Bounded.alter k f tr (lift tt , lift tt)
+    ... | Bounded.1+⟨ tr′ ⟩  = tree tr′
+    ... | Bounded.⟨ tr′ ⟩    = tree tr′
+    ... | Bounded.⟨ tr′ ⟩−1  = tree tr′
 \end{code}
 \subsection{Non-Dependent (Simple) Map}
 \begin{code}
@@ -646,6 +665,16 @@ here, we package it in thee forms.
     delete k (tree tr) with Bounded.delete k tr
     ... | tr′ Bounded.−0 = tree tr′
     ... | tr′ Bounded.−1 = tree tr′
+
+    alter  : (k : Key)
+           → ∀ {v} {V : Set v}
+           → (Maybe V → Maybe V)
+           → Map V
+           → Map V
+    alter k f (tree tr) with Bounded.alter k f tr (lift tt , lift tt)
+    ... | Bounded.1+⟨ tr′ ⟩  = tree tr′
+    ... | Bounded.⟨ tr′ ⟩    = tree tr′
+    ... | Bounded.⟨ tr′ ⟩−1  = tree tr′
 \end{code}
 \subsection{Set}
 Note that we can't call the type itself ``Set'', as that's a reserved
