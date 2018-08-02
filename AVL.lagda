@@ -165,8 +165,8 @@ Before we implement the rotations, we need a way to describe a tree
 which may have increased in height. We can do this with a
 \emph{descriptive} type:
 \begin{code}
-    _1⨤⟨_⟩    : ∀ {𝓁} (T : ℕ → Set 𝓁) → ℕ → Set 𝓁
-    T 1⨤⟨ n ⟩ = ∃[ inc? ] T (if inc? then suc n else n)
+    _1?+⟨_⟩    : ∀ {𝓁} (T : ℕ → Set 𝓁) → ℕ → Set 𝓁
+    T 1?+⟨ n ⟩ = ∃[ inc? ] T (if inc? then suc n else n)
 
     pattern 0+_ tr = false , tr
     pattern 1+_ tr = true  , tr
@@ -176,9 +176,9 @@ in height. For this, we will use a \emph{prescriptive} type (in other
 words, where the previous type was parameterized, this one will be
 indexed).
 \begin{code}
-    data _⟨_⟩≃1 {ℓ} (T : ℕ → Set ℓ) : ℕ → Set ℓ where
-      _−0 : ∀ {n} → T n → T ⟨ n ⟩≃1
-      _−1 : ∀ {n} → T n → T ⟨ suc n ⟩≃1
+    data _⟨_⟩?−1 {ℓ} (T : ℕ → Set ℓ) : ℕ → Set ℓ where
+      _−0 : ∀ {n} → T n → T ⟨ n ⟩?−1
+      _−1 : ∀ {n} → T n → T ⟨ suc n ⟩?−1
 \end{code}
 
 Whereas the previous construction would tell you the height of a tree
@@ -187,11 +187,11 @@ information you already have about the height of the tree.
 
 In certain circumstances, you can convert between the two:
 \begin{code}
-    1⨤⟨_⟩⇒≃1  : ∀ {n 𝓁} {T : ℕ → Set 𝓁}
-              → T 1⨤⟨ n ⟩
-              → T ⟨ suc n ⟩≃1
-    1⨤⟨ 0+ x ⟩⇒≃1 = x −1
-    1⨤⟨ 1+ x ⟩⇒≃1 = x −0
+    1?+⟨_⟩⇒?−1  : ∀ {n 𝓁} {T : ℕ → Set 𝓁}
+                → T 1?+⟨ n ⟩
+                → T ⟨ suc n ⟩?−1
+    1?+⟨ 0+ x ⟩⇒?−1 = x −1
+    1?+⟨ 1+ x ⟩⇒?−1 = x −0
 \end{code}
 \subsection{Right Rotation}
 When the left subtree becomes too heavy, we rotate the tree to the
@@ -202,7 +202,7 @@ right.
           → V k
           → Tree V lb [ k ] (suc (suc rh))
           → Tree V [ k ] ub rh
-          → Tree V lb ub 1⨤⟨ suc (suc rh) ⟩
+          → Tree V lb ub 1?+⟨ suc (suc rh) ⟩
 \end{code}
 This rotation comes in two varieties: single and double. Single
 rotation can be seen in figure~\ref{rightsingle}.
@@ -277,7 +277,7 @@ Left-rotation is essentially the inverse of right.
           → V k
           → Tree V lb [ k ] lh
           → Tree V [ k ] ub (suc (suc lh))
-          → Tree V lb ub 1⨤⟨ suc (suc lh) ⟩
+          → Tree V lb ub 1?+⟨ suc (suc lh) ⟩
 \end{code}
 \begin{figure}[h!]
   \centering
@@ -353,7 +353,7 @@ to supply a combining function.
              → (V k → V k → V k)
              → Tree V l u h
              → l < k < u
-             → Tree V l u 1⨤⟨ h ⟩
+             → Tree V l u 1?+⟨ h ⟩
     insert v vc f (leaf l<u) (l , u) = 1+ (node v vc ▽ (leaf l) (leaf u))
     insert v vc f (node k kc bl tl tr) prf with compare v k
     insert v vc f (node k kc bl tl tr) (l , _)
@@ -407,43 +407,28 @@ element from the tree, and the rest of the tree:
         head  : Key
         val   : V head
         l<u   : lb [<] [ head ]
-        tail  : Tree V [ head ] ub 1⨤⟨ h ⟩
+        tail  : Tree V [ head ] ub 1?+⟨ h ⟩
 \end{code}
 You'll notice it also stores a proof that the extracted element
 preserves the lower bound.
-
-The uncons function itself is written in a continuation-passing style.
 \begin{code}
-    uncons  : ∀ {lb ub h lh rh v} {V : Key → Set v}
-            → (k : Key)
-            → V k
-            → ⟨ lh ⊔ rh ⟩≡ h
-            → Tree V lb [ k ] lh
-            → Tree V [ k ] ub rh
-            → Cons V lb ub h
-    uncons k v bl tl tr = go k v bl tl tr id
-      where
-      go  : ∀ {lb ub h lh rh v ub′ h′} {V : Key → Set v}
-          → (k : Key)
-          → V k
-          → ⟨ lh ⊔ rh ⟩≡ h
-          → Tree V lb [ k ] lh
-          → Tree V [ k ] ub rh
-          → (∀  {lb′} →
-                Tree V [ lb′ ] ub   1⨤⟨ h  ⟩ →
-                Tree V [ lb′ ] ub′  1⨤⟨ h′ ⟩ )
-          → Cons V lb ub′ (h′)
-      go k v ▽ (leaf l<u) tr c = cons k v l<u (c (0+ tr))
-      go k v ▽ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
-        λ  {  (0+ tl′) → c (1+ node k v ◺  tl′ tr)
-           ;  (1+ tl′) → c (1+ node k v ▽  tl′ tr) }
-      go k v ◺ (leaf l<u) tr c = cons k v l<u (c (0+ tr))
-      go k v ◺ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
-        λ  {  (0+ tl′) → c (rotˡ k v tl′ tr)
-           ;  (1+ tl′) → c (1+ node k v ◺ tl′ tr) }
-      go k v ◿ (node kₗ vₗ blₗ tlₗ trₗ) tr c = go kₗ vₗ blₗ tlₗ trₗ
-        λ  {  (0+ tl′) → c (0+ node k v ▽  tl′ tr)
-           ;  (1+ tl′) → c (1+ node k v ◿  tl′ tr)}
+    uncons   : ∀ {lb ub h lh rh v} {V : Key → Set v}
+             → (k : Key)
+             → V k
+             → ⟨ lh ⊔ rh ⟩≡ h
+             → Tree V lb [ k ] lh
+             → Tree V [ k ] ub rh
+             → Cons V lb ub h
+    uncons k v b (leaf l<u) tr = cons k v l<u (case b of
+      λ  {  ◺  → 0+ tr
+         ;  ▽  → 0+ tr })
+    uncons k v b (node kₗ vₗ bₗ tlₗ trₗ) tr with uncons kₗ vₗ bₗ tlₗ trₗ
+    ... | cons k′ v′ l<u tail = cons k′ v′ l<u (case tail of
+        λ  {  (1+ tl′) → 1+ (node k v b tl′ tr)
+           ;  (0+ tl′) → case b of
+                 λ {  ◿  → 0+ node k v ▽  tl′ tr
+                   ;  ▽  → 1+ node k v ◺  tl′ tr
+                   ;  ◺  → rotˡ k v tl′ tr }})
 \end{code}
 \subsection{Widening and Transitivity}
 To join the two subtrees together after a deletion operation, we need
@@ -488,7 +473,7 @@ accordingly.
          → Tree V [ k ] ub rh
          → ⟨ lh ⊔ rh ⟩≡ h
          → Tree V lb [ k ] lh
-         → Tree V lb ub 1⨤⟨ h ⟩
+         → Tree V lb ub 1?+⟨ h ⟩
     join (leaf k<ub) ◿ tl = 0+ ext k<ub tl
     join {lb} (leaf k<ub) ▽ (leaf lb<k) =
       0+ leaf ([<]-trans lb lb<k k<ub)
@@ -506,20 +491,20 @@ correct complexity bounds.
     delete : ∀ {lb ub h v} {V : Key → Set v}
            → (k : Key)
            → Tree V lb ub h
-           → Tree V lb ub ⟨ h ⟩≃1
+           → Tree V lb ub ⟨ h ⟩?−1
     delete x (leaf l<u) = leaf l<u −0
     delete x (node y yv b l r) with compare x y
-    delete x (node .x yv b l r) | tri≈ _ refl _ = 1⨤⟨ join r b l ⟩⇒≃1
+    delete x (node .x yv b l r) | tri≈ _ refl _ = 1?+⟨ join r b l ⟩⇒?−1
     delete x (node y yv b l r) | tri< a _ _ with delete x l
     ... | l′ −0 = node y yv b l′ r −0
     ... | l′ −1 with b
     ... | ◿  = node y yv ▽  l′ r −1
     ... | ▽  = node y yv ◺  l′ r −0
-    ... | ◺  = 1⨤⟨ rotˡ y yv l′ r ⟩⇒≃1
+    ... | ◺  = 1?+⟨ rotˡ y yv l′ r ⟩⇒?−1
     delete x (node y yv b l r) | tri> _ _ c with delete x r
     ... | r′ −0 = node y yv b l r′ −0
     ... | r′ −1 with b
-    ... | ◿  = 1⨤⟨ rotʳ y yv l r′ ⟩⇒≃1
+    ... | ◿  = 1?+⟨ rotʳ y yv l r′ ⟩⇒?−1
     ... | ▽  = node y yv ◿  l r′ −0
     ... | ◺  = node y yv ▽  l r′ −1
 \end{code}
@@ -536,17 +521,17 @@ wrapper to represent that:
       ⟨_⟩    : ∀ {n} → T n        → T ⟨ n ⟩±1
       ⟨_⟩−1  : ∀ {n} → T n        → T ⟨ suc n ⟩±1
 
-    1⨤⟨_⟩⇒−1  : ∀ {n ℓ} {T : ℕ → Set ℓ}
-              → T 1⨤⟨ n ⟩
+    1?+⟨_⟩⇒−1  : ∀ {n ℓ} {T : ℕ → Set ℓ}
+              → T 1?+⟨ n ⟩
               → T ⟨ suc n ⟩±1
-    1⨤⟨ 0+ x ⟩⇒−1 = ⟨ x ⟩−1
-    1⨤⟨ 1+ x ⟩⇒−1 = ⟨ x ⟩
+    1?+⟨ 0+ x ⟩⇒−1 = ⟨ x ⟩−1
+    1?+⟨ 1+ x ⟩⇒−1 = ⟨ x ⟩
 
-    1⨤⟨_⟩⇒+1  : ∀ {n ℓ} {T : ℕ → Set ℓ}
-              → T 1⨤⟨ n ⟩
+    1?+⟨_⟩⇒+1  : ∀ {n ℓ} {T : ℕ → Set ℓ}
+              → T 1?+⟨ n ⟩
               → T ⟨ n ⟩±1
-    1⨤⟨ 0+ x ⟩⇒+1 = ⟨ x ⟩
-    1⨤⟨ 1+ x ⟩⇒+1 = 1+⟨ x ⟩
+    1?+⟨ 0+ x ⟩⇒+1 = ⟨ x ⟩
+    1?+⟨ 1+ x ⟩⇒+1 = 1+⟨ x ⟩
 \end{code}
 And then the function itself. It's long, but you should be able to see
 the deletion and insertion components.
@@ -565,25 +550,78 @@ the deletion and insertion components.
     alter x f (node .x yv b tl tr) (l , u)
          | tri≈ _ refl _ with f (just yv)
     ...  | just xv  = ⟨ node x xv b tl tr ⟩
-    ...  | nothing  = 1⨤⟨ join tr b tl ⟩⇒−1
+    ...  | nothing  = 1?+⟨ join tr b tl ⟩⇒−1
     alter x f (node y yv b tl tr) (l , u)
          | tri< a _ _ with alter x f tl (l , a) | b
     ...  | ⟨ tl′ ⟩    | _  = ⟨ node y yv b  tl′ tr ⟩
-    ...  | 1+⟨ tl′ ⟩  | ◿  = 1⨤⟨ rotʳ y yv tl′ tr ⟩⇒+1
+    ...  | 1+⟨ tl′ ⟩  | ◿  = 1?+⟨ rotʳ y yv tl′ tr ⟩⇒+1
     ...  | 1+⟨ tl′ ⟩  | ▽  = 1+⟨ node y yv ◿  tl′ tr ⟩
     ...  | 1+⟨ tl′ ⟩  | ◺  = ⟨ node y yv ▽  tl′ tr ⟩
     ...  | ⟨ tl′ ⟩−1  | ◿  = ⟨ node y yv ▽  tl′ tr ⟩−1
     ...  | ⟨ tl′ ⟩−1  | ▽  = ⟨ node y yv ◺  tl′ tr ⟩
-    ...  | ⟨ tl′ ⟩−1  | ◺  = 1⨤⟨ rotˡ y yv tl′ tr ⟩⇒−1
+    ...  | ⟨ tl′ ⟩−1  | ◺  = 1?+⟨ rotˡ y yv tl′ tr ⟩⇒−1
     alter x f (node y yv b tl tr) (l , u)
          | tri> _ _ c with alter x f tr (c , u) | b
     ...  | ⟨ tr′ ⟩    | _  = ⟨ node y yv b  tl tr′ ⟩
     ...  | 1+⟨ tr′ ⟩  | ◿  = ⟨ node y yv ▽  tl tr′ ⟩
     ...  | 1+⟨ tr′ ⟩  | ▽  = 1+⟨ node y yv ◺  tl tr′ ⟩
-    ...  | 1+⟨ tr′ ⟩  | ◺  = 1⨤⟨ rotˡ y yv tl tr′ ⟩⇒+1
-    ...  | ⟨ tr′ ⟩−1  | ◿  = 1⨤⟨ rotʳ y yv tl tr′ ⟩⇒−1
+    ...  | 1+⟨ tr′ ⟩  | ◺  = 1?+⟨ rotˡ y yv tl tr′ ⟩⇒+1
+    ...  | ⟨ tr′ ⟩−1  | ◿  = 1?+⟨ rotʳ y yv tl tr′ ⟩⇒−1
     ...  | ⟨ tr′ ⟩−1  | ▽  = ⟨ node y yv ◿  tl tr′ ⟩
     ...  | ⟨ tr′ ⟩−1  | ◺  = ⟨ node y yv ▽  tl tr′ ⟩−1
+\end{code}
+We can also write alterF, in the lens style.
+\begin{code}
+    open import Category.Functor using (RawFunctor)
+
+    MaybeVal : ∀ {v} (V : Set v) → Set (k ⊔ r ⊔ v)
+    MaybeVal V = Lift (k ⊔ r) (Maybe V)
+
+    alterF : ∀ {lb ub h v} {V : Key → Set v}
+          → (x : Key)
+          → ∀  {F : Set (k ⊔ r ⊔ v) → Set (k ⊔ r ⊔ v)}
+               {{functor : RawFunctor F}}
+          → (Maybe (V x) → F (MaybeVal (V x)))
+          → Tree V lb ub h
+          → lb < x < ub
+          → F (Tree V lb ub ⟨ h ⟩±1)
+    alterF {lb} {ub} {h} {_} {V} x {F} {{functor}} f root bnds
+      = go root bnds id
+      where
+      _<&>_ : ∀ {A B} → F A → (A → B) → F B
+      xs <&> f = RawFunctor._<$>_ functor f xs
+      go  : ∀ {lb′ ub′ h′}
+          → Tree V lb′ ub′ h′
+          → lb′ < x < ub′
+          → (Tree V lb′ ub′ ⟨ h′ ⟩±1 → Tree V lb ub ⟨ h ⟩±1)
+          → F (Tree V lb ub ⟨ h ⟩±1)
+      go (leaf l<u) (l , u) k = f nothing <&>
+       λ  {  (lift nothing)    → ⟨ root ⟩
+          ;  (lift (just xv))  →  k 1+⟨ node x xv ▽ (leaf l) (leaf u) ⟩ }
+      go (node y yv b tl tr) (l , u) k with compare x y
+      go (node .x yv b tl tr) (l , u) k | tri≈ _ refl _ = f (just yv) <&>
+       λ  {  (lift nothing)    → k 1?+⟨ join tr b tl ⟩⇒−1
+          ;  (lift (just xv))  → k ⟨ node x xv b tl tr ⟩}
+      go (node y yv b tl tr) (l , u) k | tri< a _ _ = go tl (l , a) (k ∘
+       λ  {  ⟨ tl′ ⟩ → ⟨ node y yv b tl′ tr ⟩
+          ;  1+⟨ tl′ ⟩ → case b of
+             λ {  ◿  → 1?+⟨ rotʳ y yv tl′ tr ⟩⇒+1
+               ;  ▽  → 1+⟨ node y yv ◿  tl′ tr ⟩
+               ;  ◺  → ⟨ node y yv ▽  tl′ tr ⟩ }
+          ;  ⟨ tl′ ⟩−1 → case b of
+             λ {  ◿  → ⟨ node y yv ▽  tl′ tr ⟩−1
+               ;  ▽  → ⟨ node y yv ◺  tl′ tr ⟩
+               ;  ◺  → 1?+⟨ rotˡ y yv tl′ tr ⟩⇒−1 }})
+      go (node y yv b tl tr) (l , u) k | tri> _ _ c = go tr (c , u) (k ∘
+       λ  {  ⟨ tr′ ⟩ → ⟨ node y yv b tl tr′ ⟩
+          ;  1+⟨ tr′ ⟩ → case b of
+             λ {  ◿  → ⟨ node y yv ▽  tl tr′ ⟩
+               ;  ▽  → 1+⟨ node y yv ◺  tl tr′ ⟩
+               ;  ◺  → 1?+⟨ rotˡ y yv tl tr′ ⟩⇒+1 }
+          ;  ⟨ tr′ ⟩−1 → case b of
+             λ {  ◿  → 1?+⟨ rotʳ y yv tl tr′ ⟩⇒−1
+               ;  ▽  → ⟨ node y yv ◿  tl tr′ ⟩
+               ;  ◺  → ⟨ node y yv ▽  tl tr′ ⟩−1 }})
 \end{code}
 \section{Packaging}
 Users don't need to be exposed to the indices on the full tree type:
