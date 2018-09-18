@@ -577,15 +577,16 @@ We can also write alterF, in the lens style.
     MaybeVal : ∀ {v} (V : Set v) → Set (k ⊔ r ⊔ v)
     MaybeVal V = Lift (k ⊔ r) (Maybe V)
 
-    alterF : ∀ {lb ub h v} {V : Key → Set v}
-          → (x : Key)
-          → ∀  {F : Set (k ⊔ r ⊔ v) → Set (k ⊔ r ⊔ v)}
-               {{functor : RawFunctor F}}
-          → (Maybe (V x) → F (MaybeVal (V x)))
-          → Tree V lb ub h
-          → lb < x < ub
-          → F (Tree V lb ub ⟨ h ⟩±1)
-    alterF {lb} {ub} {h} {_} {V} x {F} {{functor}} f root bnds
+    alterF : ∀ {lb ub h v} {V : Key → Set v} {R : Set (k ⊔ r ⊔ v)}
+           → (Tree V lb ub ⟨ h ⟩±1 → R)
+           → (x : Key)
+           → ∀  {F : Set (k ⊔ r ⊔ v) → Set (k ⊔ r ⊔ v)}
+                {{functor : RawFunctor F}}
+           → (Maybe (V x) → F (MaybeVal (V x)))
+           → Tree V lb ub h
+           → lb < x < ub
+           → F R
+    alterF {lb} {ub} {h} {_} {V} {R} k′ x {F} {{functor}} f root bnds
       = go root bnds id
       where
       _<&>_ : ∀ {A B} → F A → (A → B) → F B
@@ -594,14 +595,14 @@ We can also write alterF, in the lens style.
           → Tree V lb′ ub′ h′
           → lb′ < x < ub′
           → (Tree V lb′ ub′ ⟨ h′ ⟩±1 → Tree V lb ub ⟨ h ⟩±1)
-          → F (Tree V lb ub ⟨ h ⟩±1)
+          → F R
       go (leaf l<u) (l , u) k = f nothing <&>
-       λ  {  (lift nothing)    → ⟨ root ⟩
-          ;  (lift (just xv))  →  k 1+⟨ node x xv ▽ (leaf l) (leaf u) ⟩ }
+       λ  {  (lift nothing)    → k′ ⟨ root ⟩
+          ;  (lift (just xv))  → k′ (k 1+⟨ node x xv ▽ (leaf l) (leaf u) ⟩) }
       go (node y yv b tl tr) (l , u) k with compare x y
       go (node .x yv b tl tr) (l , u) k | tri≈ _ refl _ = f (just yv) <&>
-       λ  {  (lift nothing)    → k 1?+⟨ join tr b tl ⟩⇒−1
-          ;  (lift (just xv))  → k ⟨ node x xv b tl tr ⟩}
+       λ  {  (lift nothing)    → k′ (k 1?+⟨ join tr b tl ⟩⇒−1)
+          ;  (lift (just xv))  → k′ (k ⟨ node x xv b tl tr ⟩)  }
       go (node y yv b tl tr) (l , u) k | tri< a _ _ = go tl (l , a) (k ∘
        λ  {  ⟨ tl′ ⟩ → ⟨ node y yv b tl′ tr ⟩
           ;  1+⟨ tl′ ⟩ → case b of
