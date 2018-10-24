@@ -44,8 +44,7 @@ First, some imports.
 {-# OPTIONS --without-K #-}
 
 open import Relation.Binary
-open import Relation.Binary.PropositionalEquality
-open import Level using (Lift; lift; _⊔_; lower)
+open import Level as Level using (Lift; lift; _⊔_; lower)
 open import Data.Nat as ℕ using (ℕ; suc; zero; pred)
 open import Data.Product
 open import Data.Unit
@@ -60,12 +59,29 @@ parameterized over the \emph{key} type, and a strict total order on
 that key.
 \begin{code}
 module AVL
-  {k r} (Key : Set k)
+  {k e r} (Key : Set k)
+  {_≈_ : Rel Key e}
   {_<_ : Rel Key r}
-  (isStrictTotalOrder : IsStrictTotalOrder _≡_ _<_)
+  (isStrictTotalOrder : IsStrictTotalOrder _≈_ _<_)
   where
 
-  open IsStrictTotalOrder isStrictTotalOrder
+open IsStrictTotalOrder isStrictTotalOrder
+open IsEquivalence isEquivalence
+\end{code}
+\section{Values}
+Because we're not using propositional equality, we have to explicitly
+state that we want the equivalence relation to be sustitutive for the
+value predicate.
+\begin{code}
+record Value v : Set (e ⊔ Level.suc v ⊔ k) where
+  field
+    family : Key → Set v
+    respects : family Respects _≈_
+open Value
+
+Const : ∀ {v} (V : Set v) → Value v
+family (Const V) _ = V
+respects (Const V) _ x = x
 \end{code}
 \section{Bounded}
 The basic idea of the verified implementation is to store in each leaf
@@ -77,7 +93,7 @@ lower bounds in its indices. But what are the upper and lower bounds
 of a tree with no neighbours? To describe this case, we add lower and
 upper bounds to our key type.
 \begin{code}
-  module Bounded where
+module Bounded where
 
     infix 5 [_]
 
@@ -111,9 +127,9 @@ Finally, we can describe a value as being ``in bounds'' like so.
 To describe the balance of the tree, we use the following type:
 \begin{code}
     data ⟨_⊔_⟩≡_ : ℕ → ℕ → ℕ → Set where
-      ◿   : ∀ {n} → ⟨ suc  n ⊔      n ⟩≡ suc  n
-      ▽   : ∀ {n} → ⟨      n ⊔      n ⟩≡      n
-      ◺   : ∀ {n} → ⟨      n ⊔ suc  n ⟩≡ suc  n
+      1+0   : ∀ {n} → ⟨ suc  n ⊔      n ⟩≡ suc  n
+      0+0   : ∀ {n} → ⟨      n ⊔      n ⟩≡      n
+      0+1   : ∀ {n} → ⟨      n ⊔ suc  n ⟩≡ suc  n
 \end{code}
 The tree can be either left- or right-heavy (by one), or even. The
 indices of the type are phrased as a proof:
@@ -126,15 +142,15 @@ later.
 
 We will also need some combinators for balance:
 \begin{code}
-    ⃕ : ∀ {x y z} → ⟨ x ⊔ y ⟩≡ z → ⟨ z ⊔ x ⟩≡ z
-    ⃕  ◿   = ▽
-    ⃕  ▽   = ▽
-    ⃕  ◺   = ◿
+    ⊔-zeroʳ : ∀ {x y z} → ⟨ x ⊔ y ⟩≡ z → ⟨ z ⊔ x ⟩≡ z
+    ⊔-zeroʳ  1+0   = 0+0
+    ⊔-zeroʳ  0+0   = 0+0
+    ⊔-zeroʳ  0+1   = 1+0
 
-    ⃔ : ∀ {x y z} → ⟨ x ⊔ y ⟩≡ z → ⟨ y ⊔ z ⟩≡ z
-    ⃔  ◿   = ◺
-    ⃔  ▽   = ▽
-    ⃔  ◺   = ▽
+    ⊔-zeroˡ : ∀ {x y z} → ⟨ x ⊔ y ⟩≡ z → ⟨ y ⊔ z ⟩≡ z
+    ⊔-zeroˡ  1+0   = 0+1
+    ⊔-zeroˡ  0+0   = 0+0
+    ⊔-zeroˡ  0+1   = 0+0
 \end{code}
 \section{The Tree Type}
 The type itself is indexed by the lower and upper bounds, some
@@ -144,13 +160,13 @@ in height by more than 1. The bounds proofs also ensure that the tree
 must be ordered correctly.
 \begin{code}
     data Tree  {v}
-               (V : Key → Set v)
+               (V : Value v)
                (l u : [∙]) : ℕ →
                Set (k ⊔ v ⊔ r) where
       leaf  : (l<u : l [<] u) → Tree V l u 0
       node  : ∀  {h lh rh}
                  (k : Key)
-                 (v : V k)
+                 (v : V .family k)
                  (bl : ⟨ lh ⊔ rh ⟩≡ h)
                  (lk : Tree V l [ k ] lh)
                  (ku : Tree V [ k ] u rh) →
@@ -197,9 +213,9 @@ In certain circumstances, you can convert between the two:
 When the left subtree becomes too heavy, we rotate the tree to the
 right.
 \begin{code}
-    rotʳ  : ∀ {lb ub rh v} {V : Key → Set v}
+    rotʳ  : ∀ {lb ub rh v} {V : Value v}
           → (k : Key)
-          → V k
+          → V .family k
           → Tree V lb [ k ] (suc (suc rh))
           → Tree V [ k ] ub rh
           → Tree V lb ub 1?+⟨ suc (suc rh) ⟩
@@ -231,10 +247,10 @@ rotation can be seen in figure~\ref{rightsingle}.
   \label{rightsingle}
 \end{figure}
 \begin{code}
-    rotʳ x xv (node y yv ◿ a b) c =
-      0+ (node y yv ▽ a (node x xv ▽  b c))
-    rotʳ x xv (node y yv ▽ a b) c =
-      1+ (node y yv ◺ a (node x xv ◿  b c))
+    rotʳ x xv (node y yv 1+0 a b) c =
+      0+ (node y yv 0+0 a (node x xv 0+0  b c))
+    rotʳ x xv (node y yv 0+0 a b) c =
+      1+ (node y yv 0+1 a (node x xv 1+0  b c))
 \end{code}
 And double rotation in figure~\ref{rightdouble}.
 \begin{figure}[h]
@@ -266,15 +282,15 @@ And double rotation in figure~\ref{rightdouble}.
   \label{rightdouble}
 \end{figure}
 \begin{code}
-    rotʳ x xv (node y yv ◺  a (node z zv bl b c)) d =
-      0+ (node z zv ▽ (node y yv (⃕ bl) a b) (node x xv (⃔ bl) c d))
+    rotʳ x xv (node y yv 0+1  a (node z zv bl b c)) d =
+      0+ (node z zv 0+0 (node y yv (⊔-zeroʳ bl) a b) (node x xv (⊔-zeroˡ bl) c d))
 \end{code}
 \subsection{Left Rotation}
 Left-rotation is essentially the inverse of right.
 \begin{code}
-    rotˡ  : ∀ {lb ub lh v} {V : Key → Set v}
+    rotˡ  : ∀ {lb ub lh v} {V : Value v}
           → (k : Key)
-          → V k
+          → V .family k
           → Tree V lb [ k ] lh
           → Tree V [ k ] ub (suc (suc lh))
           → Tree V lb ub 1?+⟨ suc (suc lh) ⟩
@@ -305,10 +321,10 @@ Left-rotation is essentially the inverse of right.
 \end{figure}
 Single (seen in figure~\ref{leftsingle}).
 \begin{code}
-    rotˡ x xv c (node y yv ◺ b a) =
-      0+ (node y yv ▽ (node x xv ▽ c b) a)
-    rotˡ x xv c (node y yv ▽ b a) =
-      1+ (node y yv ◿ (node x xv ◺ c b) a)
+    rotˡ x xv c (node y yv 0+1 b a) =
+      0+ (node y yv 0+0 (node x xv 0+0 c b) a)
+    rotˡ x xv c (node y yv 0+0 b a) =
+      1+ (node y yv 1+0 (node x xv 0+1 c b) a)
 \end{code}
 \begin{figure}[h!]
   \centering
@@ -341,49 +357,49 @@ Single (seen in figure~\ref{leftsingle}).
 \end{figure}
 and double (figure~\ref{leftdouble}):
 \begin{code}
-    rotˡ x xv d (node y yv  ◿  (node z zv bl c b) a) =
-      0+ (node z zv ▽ (node x xv (⃕ bl) d c) (node y yv (⃔ bl) b a))
+    rotˡ x xv d (node y yv  1+0  (node z zv bl c b) a) =
+      0+ (node z zv 0+0 (node x xv (⊔-zeroʳ bl) d c) (node y yv (⊔-zeroˡ bl) b a))
 \end{code}
 \section{Insertion}
 After the rotations, insertion is relatively easy. We allow the caller
 to supply a combining function.
 \begin{code}
-    insert   : ∀ {l u h v} {V : Key → Set v} (k : Key)
-             → V k
-             → (V k → V k → V k)
+    insert   : ∀ {l u h v} {V : Value v} (k : Key)
+             → V .family k
+             → (V .family k → V .family k → V .family k)
              → Tree V l u h
              → l < k < u
              → Tree V l u 1?+⟨ h ⟩
-    insert v vc f (leaf l<u) (l , u) = 1+ (node v vc ▽ (leaf l) (leaf u))
+    insert v vc f (leaf l<u) (l , u) = 1+ (node v vc 0+0 (leaf l) (leaf u))
     insert v vc f (node k kc bl tl tr) prf with compare v k
     insert v vc f (node k kc bl tl tr) (l , _)
          | tri< a _ _ with insert v vc f tl (l , a)
     ...  | 0+ tl′ = 0+ (node k kc bl tl′ tr)
     ...  | 1+ tl′ with bl
-    ...  | ◿ = rotʳ k kc tl′ tr
-    ...  | ▽ = 1+  (node k kc  ◿  tl′ tr)
-    ...  | ◺ = 0+  (node k kc  ▽  tl′ tr)
-    insert v vc f (node k kc bl tl tr) _
-         | tri≈ _ refl _ = 0+ (node k (f vc kc) bl tl tr)
+    ...  | 1+0 = rotʳ k kc tl′ tr
+    ...  | 0+0 = 1+  (node k kc  1+0  tl′ tr)
+    ...  | 0+1 = 0+  (node k kc  0+0  tl′ tr)
+    insert {V = V} v vc f (node k kc bl tl tr) _
+         | tri≈ _ v≈k _ = 0+ (node k (respects V v≈k (f vc (respects V (sym v≈k) kc))) bl tl tr)
     insert v vc f (node k kc bl tl tr) (_ , u)
          | tri> _ _ c with insert v vc f tr (c , u)
     ...  | 0+ tr′ = 0+ (node k kc bl tl tr′)
     ...  | 1+ tr′ with bl
-    ...  | ◿ = 0+  (node k kc  ▽  tl tr′)
-    ...  | ▽ = 1+  (node k kc  ◺  tl tr′)
-    ...  | ◺ = rotˡ k kc tl tr′
+    ...  | 1+0 = 0+  (node k kc  0+0  tl tr′)
+    ...  | 0+0 = 1+  (node k kc  0+1  tl tr′)
+    ...  | 0+1 = rotˡ k kc tl tr′
 \end{code}
 \section{Lookup}
 Lookup is also very simple. No invariants are needed here.
 \begin{code}
     lookup  : (k : Key)
-            → ∀ {l u s v} {V : Key → Set v}
+            → ∀ {l u s v} {V : Value v}
             → Tree V l u s
-            → Maybe (V k)
+            → Maybe (V .family k)
     lookup k (leaf l<u) = nothing
-    lookup k (node v vc _ tl tr) with compare k v
+    lookup k {V = V} (node v vc _ tl tr) with compare k v
     ... | tri< _ _ _     = lookup k tl
-    ... | tri≈ _ refl _  = just vc
+    ... | tri≈ _ k≈v _  = just (respects V (sym k≈v) vc)
     ... | tri> _ _ _     = lookup k tr
 \end{code}
 \section{Deletion}
@@ -399,36 +415,36 @@ the return type from our uncons function, which stores the minimum
 element from the tree, and the rest of the tree:
 \begin{code}
     record Cons {v}
-                (V : Key → Set v)
+                (V : Value v)
                 (lb ub : [∙])
                 (h : ℕ) : Set (k ⊔ v ⊔ r) where
       constructor cons
       field
         head  : Key
-        val   : V head
+        val   : family V head
         l<u   : lb [<] [ head ]
         tail  : Tree V [ head ] ub 1?+⟨ h ⟩
 \end{code}
 You'll notice it also stores a proof that the extracted element
 preserves the lower bound.
 \begin{code}
-    uncons   : ∀ {lb ub h lh rh v} {V : Key → Set v}
+    uncons   : ∀ {lb ub h lh rh v} {V : Value v}
              → (k : Key)
-             → V k
+             → V .family k
              → ⟨ lh ⊔ rh ⟩≡ h
              → Tree V lb [ k ] lh
              → Tree V [ k ] ub rh
              → Cons V lb ub h
     uncons k v b (leaf l<u) tr = cons k v l<u (case b of
-      λ  {  ◺  → 0+ tr
-         ;  ▽  → 0+ tr })
+      λ  {  0+1  → 0+ tr
+         ;  0+0  → 0+ tr })
     uncons k v b (node kₗ vₗ bₗ tlₗ trₗ) tr with uncons kₗ vₗ bₗ tlₗ trₗ
     ... | cons k′ v′ l<u tail = cons k′ v′ l<u (case tail of
         λ  {  (1+ tl′) → 1+ (node k v b tl′ tr)
            ;  (0+ tl′) → case b of
-                 λ {  ◿  → 0+ node k v ▽  tl′ tr
-                   ;  ▽  → 1+ node k v ◺  tl′ tr
-                   ;  ◺  → rotˡ k v tl′ tr }})
+                 λ {  1+0  → 0+ node k v 0+0  tl′ tr
+                   ;  0+0  → 1+ node k v 0+1  tl′ tr
+                   ;  0+1  → rotˡ k v tl′ tr }})
 \end{code}
 \subsection{Widening and Transitivity}
 To join the two subtrees together after a deletion operation, we need
@@ -457,7 +473,7 @@ For the exting, we'll need some properties on orderings:
 Finally, the ext function itself simply walks down the right branch
 of the tree until it hits a leaf.
 \begin{code}
-    ext : ∀ {lb ub ub′ h v} {V : Key → Set v}
+    ext : ∀ {lb ub ub′ h v} {V : Value v}
          → ub [<] ub′
          → Tree V lb ub h
          → Tree V lb ub′ h
@@ -469,44 +485,44 @@ Once we have the two subtrees that will form the children of our
 replaced node, we need to join them together, adjusting the types
 accordingly.
 \begin{code}
-    join : ∀ {lb ub lh rh h v k} {V : Key → Set v}
+    join : ∀ {lb ub lh rh h v k} {V : Value v}
          → Tree V [ k ] ub rh
          → ⟨ lh ⊔ rh ⟩≡ h
          → Tree V lb [ k ] lh
          → Tree V lb ub 1?+⟨ h ⟩
-    join (leaf k<ub) ◿ tl = 0+ ext k<ub tl
-    join {lb} (leaf k<ub) ▽ (leaf lb<k) =
+    join (leaf k<ub) 1+0 tl = 0+ ext k<ub tl
+    join {lb} (leaf k<ub) 0+0 (leaf lb<k) =
       0+ leaf ([<]-trans lb lb<k k<ub)
     join (node kᵣ vᵣ bᵣ tlᵣ trᵣ) b  tl with uncons kᵣ vᵣ bᵣ tlᵣ trᵣ
     ... | cons k′ v′ l<u (1+ tr′) = 1+ node k′ v′ b  (ext l<u tl) tr′
     ... | cons k′ v′ l<u (0+ tr′) with b
-    ... | ◿ = rotʳ k′ v′ (ext l<u tl) tr′
-    ... | ▽ = 1+ node k′ v′ ◿  (ext l<u tl) tr′
-    ... | ◺ = 0+ node k′ v′ ▽  (ext l<u tl) tr′
+    ... | 1+0 = rotʳ k′ v′ (ext l<u tl) tr′
+    ... | 0+0 = 1+ node k′ v′ 1+0  (ext l<u tl) tr′
+    ... | 0+1 = 0+ node k′ v′ 0+0  (ext l<u tl) tr′
 \end{code}
 \subsection{Full Deletion}
 The deletion function is by no means simple, but it does maintain the
 correct complexity bounds.
 \begin{code}
-    delete : ∀ {lb ub h v} {V : Key → Set v}
+    delete : ∀ {lb ub h v} {V : Value v}
            → (k : Key)
            → Tree V lb ub h
            → Tree V lb ub ⟨ h ⟩?−1
     delete x (leaf l<u) = leaf l<u −0
     delete x (node y yv b l r) with compare x y
-    delete x (node .x yv b l r) | tri≈ _ refl _ = 1?+⟨ join r b l ⟩⇒?−1
+    delete x (node y yv b l r) | tri≈ _ _ _ = 1?+⟨ join r b l ⟩⇒?−1
     delete x (node y yv b l r) | tri< a _ _ with delete x l
     ... | l′ −0 = node y yv b l′ r −0
     ... | l′ −1 with b
-    ... | ◿  = node y yv ▽  l′ r −1
-    ... | ▽  = node y yv ◺  l′ r −0
-    ... | ◺  = 1?+⟨ rotˡ y yv l′ r ⟩⇒?−1
+    ... | 1+0  = node y yv 0+0  l′ r −1
+    ... | 0+0  = node y yv 0+1  l′ r −0
+    ... | 0+1  = 1?+⟨ rotˡ y yv l′ r ⟩⇒?−1
     delete x (node y yv b l r) | tri> _ _ c with delete x r
     ... | r′ −0 = node y yv b l r′ −0
     ... | r′ −1 with b
-    ... | ◿  = 1?+⟨ rotʳ y yv l r′ ⟩⇒?−1
-    ... | ▽  = node y yv ◿  l r′ −0
-    ... | ◺  = node y yv ▽  l r′ −1
+    ... | 1+0  = 1?+⟨ rotʳ y yv l r′ ⟩⇒?−1
+    ... | 0+0  = node y yv 1+0  l r′ −0
+    ... | 0+1  = node y yv 0+0  l r′ −1
 \end{code}
 \section{Alteration}
 This is a combination of insertion and deletion: it lets the user
@@ -536,39 +552,39 @@ wrapper to represent that:
 And then the function itself. It's long, but you should be able to see
 the deletion and insertion components.
 \begin{code}
-    alter : ∀ {lb ub h v} {V : Key → Set v}
+    alter : ∀ {lb ub h v} {V : Value v}
           → (k : Key)
-          → (Maybe (V k) → Maybe (V k))
+          → (Maybe (V .family k) → Maybe (V .family k))
           → Tree V lb ub h
           → lb < k < ub
           → Tree V lb ub ⟨ h ⟩±1
     alter x f (leaf l<u) (l , u) with f nothing
-    ...  | just xv  = 1+⟨ node x xv ▽ (leaf l) (leaf u) ⟩
+    ...  | just xv  = 1+⟨ node x xv 0+0 (leaf l) (leaf u) ⟩
     ...  | nothing  = ⟨ leaf l<u ⟩
     alter x f (node y yv b tl tr) (l , u)
       with compare x y
-    alter x f (node .x yv b tl tr) (l , u)
-         | tri≈ _ refl _ with f (just yv)
-    ...  | just xv  = ⟨ node x xv b tl tr ⟩
+    alter {V = V} x f (node y yv b tl tr) (l , u)
+         | tri≈ _ x≈y _ with f (just (respects V (sym x≈y) yv))
+    ...  | just xv  = ⟨ node y (respects V x≈y xv) b tl tr ⟩
     ...  | nothing  = 1?+⟨ join tr b tl ⟩⇒−1
     alter x f (node y yv b tl tr) (l , u)
          | tri< a _ _ with alter x f tl (l , a) | b
     ...  | ⟨ tl′ ⟩    | _  = ⟨ node y yv b  tl′ tr ⟩
-    ...  | 1+⟨ tl′ ⟩  | ◿  = 1?+⟨ rotʳ y yv tl′ tr ⟩⇒+1
-    ...  | 1+⟨ tl′ ⟩  | ▽  = 1+⟨ node y yv ◿  tl′ tr ⟩
-    ...  | 1+⟨ tl′ ⟩  | ◺  = ⟨ node y yv ▽  tl′ tr ⟩
-    ...  | ⟨ tl′ ⟩−1  | ◿  = ⟨ node y yv ▽  tl′ tr ⟩−1
-    ...  | ⟨ tl′ ⟩−1  | ▽  = ⟨ node y yv ◺  tl′ tr ⟩
-    ...  | ⟨ tl′ ⟩−1  | ◺  = 1?+⟨ rotˡ y yv tl′ tr ⟩⇒−1
+    ...  | 1+⟨ tl′ ⟩  | 1+0  = 1?+⟨ rotʳ y yv tl′ tr ⟩⇒+1
+    ...  | 1+⟨ tl′ ⟩  | 0+0  = 1+⟨ node y yv 1+0  tl′ tr ⟩
+    ...  | 1+⟨ tl′ ⟩  | 0+1  = ⟨ node y yv 0+0  tl′ tr ⟩
+    ...  | ⟨ tl′ ⟩−1  | 1+0  = ⟨ node y yv 0+0  tl′ tr ⟩−1
+    ...  | ⟨ tl′ ⟩−1  | 0+0  = ⟨ node y yv 0+1  tl′ tr ⟩
+    ...  | ⟨ tl′ ⟩−1  | 0+1  = 1?+⟨ rotˡ y yv tl′ tr ⟩⇒−1
     alter x f (node y yv b tl tr) (l , u)
          | tri> _ _ c with alter x f tr (c , u) | b
     ...  | ⟨ tr′ ⟩    | _  = ⟨ node y yv b  tl tr′ ⟩
-    ...  | 1+⟨ tr′ ⟩  | ◿  = ⟨ node y yv ▽  tl tr′ ⟩
-    ...  | 1+⟨ tr′ ⟩  | ▽  = 1+⟨ node y yv ◺  tl tr′ ⟩
-    ...  | 1+⟨ tr′ ⟩  | ◺  = 1?+⟨ rotˡ y yv tl tr′ ⟩⇒+1
-    ...  | ⟨ tr′ ⟩−1  | ◿  = 1?+⟨ rotʳ y yv tl tr′ ⟩⇒−1
-    ...  | ⟨ tr′ ⟩−1  | ▽  = ⟨ node y yv ◿  tl tr′ ⟩
-    ...  | ⟨ tr′ ⟩−1  | ◺  = ⟨ node y yv ▽  tl tr′ ⟩−1
+    ...  | 1+⟨ tr′ ⟩  | 1+0  = ⟨ node y yv 0+0  tl tr′ ⟩
+    ...  | 1+⟨ tr′ ⟩  | 0+0  = 1+⟨ node y yv 0+1  tl tr′ ⟩
+    ...  | 1+⟨ tr′ ⟩  | 0+1  = 1?+⟨ rotˡ y yv tl tr′ ⟩⇒+1
+    ...  | ⟨ tr′ ⟩−1  | 1+0  = 1?+⟨ rotʳ y yv tl tr′ ⟩⇒−1
+    ...  | ⟨ tr′ ⟩−1  | 0+0  = ⟨ node y yv 1+0  tl tr′ ⟩
+    ...  | ⟨ tr′ ⟩−1  | 0+1  = ⟨ node y yv 0+0  tl tr′ ⟩−1
 \end{code}
 We can also write alterF, in the lens style.
 \begin{code}
@@ -577,12 +593,12 @@ We can also write alterF, in the lens style.
     MaybeVal : ∀ {v} (V : Set v) → Set (k ⊔ r ⊔ v)
     MaybeVal V = Lift (k ⊔ r) (Maybe V)
 
-    alterF : ∀ {lb ub h v} {V : Key → Set v} {R : Set (k ⊔ r ⊔ v)}
+    alterF : ∀ {lb ub h v} {V : Value v} {R : Set (k ⊔ r ⊔ v)}
            → (Tree V lb ub ⟨ h ⟩±1 → R)
            → (x : Key)
            → ∀  {F : Set (k ⊔ r ⊔ v) → Set (k ⊔ r ⊔ v)}
                 {{functor : RawFunctor F}}
-           → (Maybe (V x) → F (MaybeVal (V x)))
+           → (Maybe (family V x) → F (MaybeVal (family V x)))
            → Tree V lb ub h
            → lb < x < ub
            → F R
@@ -598,144 +614,147 @@ We can also write alterF, in the lens style.
           → F R
       go (leaf l<u) (l , u) k = f nothing <&>
        λ  {  (lift nothing)    → k′ ⟨ root ⟩
-          ;  (lift (just xv))  → k′ (k 1+⟨ node x xv ▽ (leaf l) (leaf u) ⟩) }
+          ;  (lift (just xv))  → k′ (k 1+⟨ node x xv 0+0 (leaf l) (leaf u) ⟩) }
       go (node y yv b tl tr) (l , u) k with compare x y
-      go (node .x yv b tl tr) (l , u) k | tri≈ _ refl _ = f (just yv) <&>
+      go (node y yv b tl tr) (l , u) k | tri≈ _ x≈y _ = f (just (respects V (sym x≈y) yv)) <&>
        λ  {  (lift nothing)    → k′ (k 1?+⟨ join tr b tl ⟩⇒−1)
-          ;  (lift (just xv))  → k′ (k ⟨ node x xv b tl tr ⟩)  }
+          ;  (lift (just xv))  → k′ (k ⟨ node y (respects V x≈y xv) b tl tr ⟩)  }
       go (node y yv b tl tr) (l , u) k | tri< a _ _ = go tl (l , a) (k ∘
        λ  {  ⟨ tl′ ⟩ → ⟨ node y yv b tl′ tr ⟩
           ;  1+⟨ tl′ ⟩ → case b of
-             λ {  ◿  → 1?+⟨ rotʳ y yv tl′ tr ⟩⇒+1
-               ;  ▽  → 1+⟨ node y yv ◿  tl′ tr ⟩
-               ;  ◺  → ⟨ node y yv ▽  tl′ tr ⟩ }
+             λ {  1+0  → 1?+⟨ rotʳ y yv tl′ tr ⟩⇒+1
+               ;  0+0  → 1+⟨ node y yv 1+0  tl′ tr ⟩
+               ;  0+1  → ⟨ node y yv 0+0  tl′ tr ⟩ }
           ;  ⟨ tl′ ⟩−1 → case b of
-             λ {  ◿  → ⟨ node y yv ▽  tl′ tr ⟩−1
-               ;  ▽  → ⟨ node y yv ◺  tl′ tr ⟩
-               ;  ◺  → 1?+⟨ rotˡ y yv tl′ tr ⟩⇒−1 }})
+             λ {  1+0  → ⟨ node y yv 0+0  tl′ tr ⟩−1
+               ;  0+0  → ⟨ node y yv 0+1  tl′ tr ⟩
+               ;  0+1  → 1?+⟨ rotˡ y yv tl′ tr ⟩⇒−1 }})
       go (node y yv b tl tr) (l , u) k | tri> _ _ c = go tr (c , u) (k ∘
        λ  {  ⟨ tr′ ⟩ → ⟨ node y yv b tl tr′ ⟩
           ;  1+⟨ tr′ ⟩ → case b of
-             λ {  ◿  → ⟨ node y yv ▽  tl tr′ ⟩
-               ;  ▽  → 1+⟨ node y yv ◺  tl tr′ ⟩
-               ;  ◺  → 1?+⟨ rotˡ y yv tl tr′ ⟩⇒+1 }
+             λ {  1+0  → ⟨ node y yv 0+0  tl tr′ ⟩
+               ;  0+0  → 1+⟨ node y yv 0+1  tl tr′ ⟩
+               ;  0+1  → 1?+⟨ rotˡ y yv tl tr′ ⟩⇒+1 }
           ;  ⟨ tr′ ⟩−1 → case b of
-             λ {  ◿  → 1?+⟨ rotʳ y yv tl tr′ ⟩⇒−1
-               ;  ▽  → ⟨ node y yv ◿  tl tr′ ⟩
-               ;  ◺  → ⟨ node y yv ▽  tl tr′ ⟩−1 }})
+             λ {  1+0  → 1?+⟨ rotʳ y yv tl tr′ ⟩⇒−1
+               ;  0+0  → ⟨ node y yv 1+0  tl tr′ ⟩
+               ;  0+1  → ⟨ node y yv 0+0  tl tr′ ⟩−1 }})
 \end{code}
 \section{Packaging}
 Users don't need to be exposed to the indices on the full tree type:
 here, we package it in thee forms.
 \subsection{Dependent Map}
 \begin{code}
-  module DependantMap where
-    data Map {v} (V : Key → Set v) : Set (k ⊔ v ⊔ r) where
-      tree  : ∀ {h}
-            → Bounded.Tree V Bounded.⌊⌋ Bounded.⌈⌉ h
-            → Map V
+module DependantMap where
+  data Map {v} (V : Value v) : Set (k ⊔ v ⊔ r) where
+    tree  : ∀ {h}
+          → Bounded.Tree V Bounded.⌊⌋ Bounded.⌈⌉ h
+          → Map V
 
-    insertWith  : ∀ {v} {V : Key → Set v} (k : Key)
-                → V k
-                → (V k → V k → V k)
-                → Map V
-                → Map V
-    insertWith k v f (tree tr) =
-      tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
+  insertWith  : ∀ {v} {V : Value v} (k : Key)
+              → V .family k
+              → (V .family k → V .family k → V .family k)
+              → Map V
+              → Map V
+  insertWith k v f (tree tr) =
+    tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
 
-    insert : ∀  {v}
-                {V : Key → Set v}
-                (k : Key) →
-                V k →
-                Map V →
-                Map V
-    insert k v = insertWith k v const
+  insert : ∀  {v}
+              {V : Value v}
+              (k : Key) →
+              V .family k →
+              Map V →
+              Map V
+  insert k v = insertWith k v const
 
-    lookup  : (k : Key)
-            → ∀ {v} {V : Key → Set v}
-            → Map V
-            → Maybe (V k)
-    lookup k (tree tr) = Bounded.lookup k tr
+  empty : ∀ {v} {V : Value v} → Map V
+  empty = tree (Bounded.leaf (lift tt))
 
-    delete  : (k : Key)
-            → ∀ {v} {V : Key → Set v}
-            → Map V
-            → Map V
-    delete k (tree tr) with Bounded.delete k tr
-    ... | tr′ Bounded.−0 = tree tr′
-    ... | tr′ Bounded.−1 = tree tr′
+  lookup  : (k : Key)
+          → ∀ {v} {V : Value v}
+          → Map V
+          → Maybe (V .family k)
+  lookup k (tree tr) = Bounded.lookup k tr
 
-    alter  : (k : Key)
-           → ∀ {v} {V : Key → Set v}
-           → (Maybe (V k) → Maybe (V k))
-           → Map V
-           → Map V
-    alter k f (tree tr) with Bounded.alter k f tr (lift tt , lift tt)
-    ... | Bounded.1+⟨ tr′ ⟩  = tree tr′
-    ... | Bounded.⟨ tr′ ⟩    = tree tr′
-    ... | Bounded.⟨ tr′ ⟩−1  = tree tr′
+  delete  : (k : Key)
+          → ∀ {v} {V : Value v}
+          → Map V
+          → Map V
+  delete k (tree tr) with Bounded.delete k tr
+  ... | tr′ Bounded.−0 = tree tr′
+  ... | tr′ Bounded.−1 = tree tr′
+
+  alter  : (k : Key)
+          → ∀ {v} {V : Value v}
+          → (Maybe (V .family k) → Maybe (V .family k))
+          → Map V
+          → Map V
+  alter k f (tree tr) with Bounded.alter k f tr (lift tt , lift tt)
+  ... | Bounded.1+⟨ tr′ ⟩  = tree tr′
+  ... | Bounded.⟨ tr′ ⟩    = tree tr′
+  ... | Bounded.⟨ tr′ ⟩−1  = tree tr′
 \end{code}
 \subsection{Non-Dependent (Simple) Map}
 \begin{code}
-  module Map where
-    data Map {v} (V : Set v) : Set (k ⊔ v ⊔ r) where
-      tree  : ∀ {h}
-            → Bounded.Tree (const V) Bounded.⌊⌋ Bounded.⌈⌉ h
-            → Map V
+module Map where
+  data Map {v} (V : Set v) : Set (k ⊔ v ⊔ r) where
+    tree  : ∀ {h}
+          → Bounded.Tree (Const V) Bounded.⌊⌋ Bounded.⌈⌉ h
+          → Map V
 
-    insertWith  : ∀ {v} {V : Set v} (k : Key)
-                → V
-                → (V → V → V)
-                → Map V
-                → Map V
-    insertWith k v f (tree tr) =
-      tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
+  insertWith  : ∀ {v} {V : Set v} (k : Key)
+              → V
+              → (V → V → V)
+              → Map V
+              → Map V
+  insertWith k v f (tree tr) =
+    tree (proj₂ (Bounded.insert k v f tr (lift tt , lift tt)))
 
-    empty : ∀ {v} {V : Set v} → Map V
-    empty = tree (Bounded.leaf (lift tt))
+  empty : ∀ {v} {V : Set v} → Map V
+  empty = tree (Bounded.leaf (lift tt))
 
-    insert : ∀ {v} {V : Set v} (k : Key) → V → Map V → Map V
-    insert k v = insertWith k v const
+  insert : ∀ {v} {V : Set v} (k : Key) → V → Map V → Map V
+  insert k v = insertWith k v const
 
-    lookup : (k : Key) → ∀ {v} {V : Set v} → Map V → Maybe V
-    lookup k (tree tr) = Bounded.lookup k tr
+  lookup : (k : Key) → ∀ {v} {V : Set v} → Map V → Maybe V
+  lookup k (tree tr) = Bounded.lookup k tr
 
-    delete : (k : Key) → ∀ {v} {V : Set v} → Map V → Map V
-    delete k (tree tr) with Bounded.delete k tr
-    ... | tr′ Bounded.−0 = tree tr′
-    ... | tr′ Bounded.−1 = tree tr′
+  delete : (k : Key) → ∀ {v} {V : Set v} → Map V → Map V
+  delete k (tree tr) with Bounded.delete k tr
+  ... | tr′ Bounded.−0 = tree tr′
+  ... | tr′ Bounded.−1 = tree tr′
 
-    alter  : (k : Key)
-           → ∀ {v} {V : Set v}
-           → (Maybe V → Maybe V)
-           → Map V
-           → Map V
-    alter k f (tree tr) with Bounded.alter k f tr (lift tt , lift tt)
-    ... | Bounded.1+⟨ tr′ ⟩  = tree tr′
-    ... | Bounded.⟨ tr′ ⟩    = tree tr′
-    ... | Bounded.⟨ tr′ ⟩−1  = tree tr′
+  alter  : (k : Key)
+          → ∀ {v} {V : Set v}
+          → (Maybe V → Maybe V)
+          → Map V
+          → Map V
+  alter k f (tree tr) with Bounded.alter k f tr (lift tt , lift tt)
+  ... | Bounded.1+⟨ tr′ ⟩  = tree tr′
+  ... | Bounded.⟨ tr′ ⟩    = tree tr′
+  ... | Bounded.⟨ tr′ ⟩−1  = tree tr′
 \end{code}
 \subsection{Set}
 Note that we can't call the type itself ``Set'', as that's a reserved
 word in Agda.
 \begin{code}
-  module Sets where
-    data ⟨Set⟩ : Set (k ⊔ r) where
-      tree  : ∀ {h}
-            → Bounded.Tree (const ⊤) Bounded.⌊⌋ Bounded.⌈⌉ h
-            → ⟨Set⟩
+module Sets where
+  data ⟨Set⟩ : Set (k ⊔ r) where
+    tree  : ∀ {h}
+          → Bounded.Tree (Const ⊤) Bounded.⌊⌋ Bounded.⌈⌉ h
+          → ⟨Set⟩
 
-    insert : Key → ⟨Set⟩ → ⟨Set⟩
-    insert k (tree tr) =
-      tree (proj₂ (Bounded.insert k tt const tr (lift tt , lift tt)))
+  insert : Key → ⟨Set⟩ → ⟨Set⟩
+  insert k (tree tr) =
+    tree (proj₂ (Bounded.insert k tt const tr (lift tt , lift tt)))
 
-    member : Key → ⟨Set⟩ → Bool
-    member k (tree tr) = is-just (Bounded.lookup k tr)
+  member : Key → ⟨Set⟩ → Bool
+  member k (tree tr) = is-just (Bounded.lookup k tr)
 
-    delete : (k : Key) → ⟨Set⟩ → ⟨Set⟩
-    delete k (tree tr) with Bounded.delete k tr
-    ... | tr′ Bounded.−0 = tree tr′
-    ... | tr′ Bounded.−1 = tree tr′
+  delete : (k : Key) → ⟨Set⟩ → ⟨Set⟩
+  delete k (tree tr) with Bounded.delete k tr
+  ... | tr′ Bounded.−0 = tree tr′
+  ... | tr′ Bounded.−1 = tree tr′
 \end{code}
 \bibliographystyle{IEEEtranS}
 \bibliography{../AVL.bib}
